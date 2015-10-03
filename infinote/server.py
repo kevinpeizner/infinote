@@ -58,8 +58,11 @@ def get_password(username):
 
 @auth.error_handler
 def unauthorized():
-  return make_response(jsonify({'error': 'Unauthorized access'}), 403) # Use 403 instead of 401 to prevent auth pop-ups on client.
+  return make_response(jsonify({'error': 'Unauthorized access'}), 401) # Use 403 instead of 401 to prevent auth pop-ups on client.
 
+@app.route('/todo/api/v1.0/logout', methods=['GET'])
+def logout():
+  return make_response(jsonify({'success': 'Logged out'}), 401)
 
 
 ### CRUD ###
