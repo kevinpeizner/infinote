@@ -1,60 +1,29 @@
-import http.server
-import socketserver
-import time
-import ripper
+from flask import Flask, jsonify
 
-HOST = ''
-PORT = 9999
-CHUNK_SIZE = 1024
+app = Flask(__name__)
 
-def now():
-    return time.ctime(time.time())
+tasks = [
+  {
+    'id': 1,
+    'title': u'Buy groceries',
+    'description': u'Milk, Cheese, Pizza, Fruit, Tylenol', 
+    'done': False
+  },
+  {
+    'id': 2,
+    'title': u'Learn Python',
+    'description': u'Need to find a good Python tutorial on the web', 
+    'done': False
+  }
+]
 
-class ClientHandler(http.server.BaseHTTPRequestHandler):
+@app.route('/todo/api/v1.0/tasks', methods=['GET'])
+def get_tasks():
+  return jsonify({'tasks': tasks})
 
-    def do_GET(self):
-        print(self.path)
+@app.route('/infinote/api/v1.0/', methods=['POST'])
+def job_kickoff():
+  return jsonify({'tasks': tasks})
 
-    def progress_cb(total, recvd, ratio, rate, eta):
-        prg_stats = (recvd, ratio, rate, eta)
-        status = ripper.status_string.format(*prg_stats)
-        ClientHandler.sckt.send(status.encode('utf-8'))
-
-#    def handledata(self, data):
-#        reply = ''
-#        decodeddata = data.decode('utf-8').split(' ')
-#        cmd = decodeddata[0].lower()
-#        print('Handling cmd: ', cmd)
-#        if cmd == 'exit':
-#            reply = 'exit'
-#        elif cmd == 'echo':
-#            reply = 'Echo => '+data.decode('utf-8')
-#        elif cmd == 'get':
-#            ClientHandler.sckt = self.request
-#            ripper.getaudio(decodeddata[1], '.')
-#            reply = 'done'
-#
-#        return reply
-#
-#    def handle(self):
-#        print(self.client_address, now())
-#        while True:
-#            data = self.request.recv(CHUNK_SIZE)
-#            if not data:
-#                break
-#            reply = self.handledata(data)
-#            print('REPLYING: ', reply)
-#            self.request.send(reply.encode('utf-8'))
-#            if reply == 'exit':
-#                break
-#
-#        print('Bye-bye ', self.client_address)
-#        self.request.close()
-
-print(ripper.progress_cb)
-ripper.progress_cb = ClientHandler.progress_cb
-print(ripper.progress_cb)
-
-server = socketserver.ThreadingTCPServer((HOST, PORT), ClientHandler)
-server.allow_reuse_address = True
-server.serve_forever()
+if __name__ == '__main__':
+  app.run(debug=True)
