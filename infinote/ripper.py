@@ -33,21 +33,45 @@ def progress_cb(total, recvd, ratio, rate, eta):
     status = status_string.format(*prg_stats)
     print(status)
 
-def getaudio(url, path):
-    video = pafy.new(url)
+def getaudio(url, path="."):
+    if 'www.' in url and 'www.youtube.com/watch?v=' not in url:
+      print('ERROR: Url does not point to youtube.')
+      return 'ERROR: Url does not point to youtube.'
+
+    # Can take 11 char video id or full link
+    # Fails silently when using full url to non-youtube site
+    # TODO: some error handling for not found needed
+    try:
+      video = pafy.new(url)
+    except ValueError as err:
+      # invalid v_id
+      print(err.args)
+      return 'ERROR: '+err.args[0]
+    except OSError as err:
+      # invalid full youtube url
+      print(err.args)
+      return 'ERROR: '+err.args[0]
+    except:
+      # unknown error
+      print(type(err))
+      print(err.args)
+      print(err)
+      return 'ERROR: An unknown error occurred.'
+
 #    print(video.username)
     filename = parsetitle(video.title)
-    print(filename)
     audio = video.getbestaudio()
 
     path = os.path.abspath(path)
     if not os.path.isdir(path):
         path='.'
     path +='/'+filename+'.'+audio.extension
+#    print(path)
 
-    print(path)
-
+    # TODO: kick this off to another thread with .ogg tagging abilities
     audio.download(filepath=path, quiet=True, callback=progress_cb)
+
+    print(filename)
     return filename
 
 if __name__ == "__main__":
