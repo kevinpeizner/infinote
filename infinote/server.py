@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for
 from flask.ext.httpauth import HTTPBasicAuth
+import ripper
 
 app = Flask(__name__)
 auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DONE ON HTTPS CONNECTION
@@ -8,32 +9,40 @@ auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DO
 
 ### Data Model ###
 # TODO: need real data to be stored in database
-tasks = [
-  {
-    'id': 1,
-    'title': u'Buy groceries',
-    'description': u'Milk, Cheese, Pizza, Fruit, Tylenol', 
-    'done': False
-  },
-  {
-    'id': 2,
-    'title': u'Learn Python',
-    'description': u'Need to find a good Python tutorial on the web', 
-    'done': False
-  }
-]
+# Job json format:
+# {
+#   id: x,
+#   v_id: '',
+#   title: '',
+#   prog: x.xx,
+#   done: false,
+#   link: https://[domain]/xxxxxx
+# }
+jobs = []
 
 
 
 ### Helper Functions ###
-def make_public_task(task):
-  new_task = {}
-  for field in task:
+def make_public_job(job):
+  new_job = {}
+  for field in job:
     if field == 'id':
-      new_task['uri'] = url_for('get_task', task_id=task['id'], _external=True)
+      new_job['uri'] = url_for('get_job', job_id=job['id'], _external=True)
     else:
-      new_task[field] = task[field]
-  return new_task
+      new_job[field] = job[field]
+  return new_job
+
+def gen_job_id():
+  if not jobs:
+    _id = 1
+  else:
+    _id = jobs[-1]['id'] + 1
+  return _id
+
+def _create_job(v_id):
+  _id = gen_job_id()
+  _title = ripper.getaudio(v_id)
+  return _id, _title
 
 
 
@@ -52,57 +61,60 @@ def bad_request(error):
 @auth.get_password
 def get_password(username):
   # TODO use real username/password -- user/pass database?
-  if username == 'miguel':
-    return 'python'
+  if username == 'admin':
+    return 'pass'
   return None
 
 @auth.error_handler
 def unauthorized():
   return make_response(jsonify({'error': 'Unauthorized access'}), 401) # Use 403 instead of 401 to prevent auth pop-ups on client.
 
-@app.route('/todo/api/v1.0/logout', methods=['GET'])
+@app.route('/infinote/api/v1.0/logout', methods=['GET'])
 def logout():
   return make_response(jsonify({'success': 'Logged out'}), 401)
 
 
 ### CRUD ###
 # Create
-@app.route('/todo/api/v1.0/tasks', methods=['POST'])
+@app.route('/infinote/api/v1.0/jobs', methods=['POST'])
 @auth.login_required
-def create_task():
-  if not request.json or not 'title' in request.json:
+def create_job():
+  if not request.json or not 'v_id' in request.json:
     abort(400)
-  task = {
-    'id': tasks[-1]['id'] + 1,
-    'title': request.json['title'],
-    'description': request.json.get('description', ""),
-    'done': False
+  new_id, title = _create_job(request.json['v_id'])
+  job = {
+    'id': new_id,
+#    'v_id': request.json['v_id'],
+    'title': '',
+    'prog': 0.00,
+    'done': False,
+    'link': ''
   }
-  tasks.append(task)
-  return jsonify({'task': make_public_task(task)}), 201
+  jobs.append(job)
+  return jsonify({'job': make_public_job(job)}), 201
 
 # Read All
-@app.route('/todo/api/v1.0/tasks', methods=['GET'])
+@app.route('/infinote/api/v1.0/jobs', methods=['GET'])
 @auth.login_required
-def get_tasks():
+def get_jobs():
   print(request.headers)
-  return jsonify({'tasks': [make_public_task(task) for task in tasks]})
+  return jsonify({'jobs': [make_public_job(job) for job in jobs]})
 
 # Read x
-@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['GET'])
+@app.route('/infinote/api/v1.0/jobs/<int:job_id>', methods=['GET'])
 @auth.login_required
-def get_task(task_id):
-  task = [task for task in tasks if task['id'] == task_id]
-  if len(task) == 0:
+def get_job(job_id):
+  job = [job for job in jobs if job['id'] == job_id]
+  if len(job) == 0:
     abort(404)
-  return jsonify({'task': make_public_task(task[0])})
+  return jsonify({'job': make_public_job(job[0])})
 
 # Update
-@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['PUT'])
+@app.route('/infinote/api/v1.0/jobs/<int:job_id>', methods=['PUT'])
 @auth.login_required
-def update_task(task_id):
-  task = [task for task in tasks if task['id'] == task_id]
-  if len(task) == 0:
+def update_job(job_id):
+  job = [job for job in jobs if job['id'] == job_id]
+  if len(job) == 0:
     abort(404)
   if not request.json:
     abort(400)
@@ -112,28 +124,20 @@ def update_task(task_id):
     abort(400)
   if 'done' in request.json and type(request.json['done']) is not bool:
     abort(400)
-  task[0]['title'] = request.json.get('title', task[0]['title'])
-  task[0]['description'] = request.json.get('description', task[0]['description'])
-  task[0]['done'] = request.json.get('done', task[0]['done'])
-  return jsonify({'task': make_public_task(task[0])})
+  job[0]['title'] = request.json.get('title', job[0]['title'])
+  job[0]['description'] = request.json.get('description', job[0]['description'])
+  job[0]['done'] = request.json.get('done', job[0]['done'])
+  return jsonify({'job': make_public_job(job[0])})
 
 # Delete
-@app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['DELETE'])
+@app.route('/infinote/api/v1.0/jobs/<int:job_id>', methods=['DELETE'])
 @auth.login_required
-def delete_task(task_id):
-  task = [task for task in tasks if task['id'] == task_id]
-  if len(task) == 0:
+def delete_job(job_id):
+  job = [job for job in jobs if job['id'] == job_id]
+  if len(job) == 0:
     abort(404)
-  tasks.remove(task[0])
+  jobs.remove(job[0])
   return jsonify({'result': True})
-
-
-
-### CUSTOM ###
-@app.route('/infinote/api/v1.0/', methods=['POST'])
-@auth.login_required
-def job_kickoff():
-  return jsonify({'tasks': tasks})
 
 
 
