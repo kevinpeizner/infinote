@@ -1,14 +1,20 @@
-from flask import Flask, jsonify, abort, make_response, request, url_for
+from flask import Flask, jsonify, abort, make_response, request, url_for, current_app
 from flask.ext.httpauth import HTTPBasicAuth
-import ripper
+import ripper, re
+
+v_id_len = 11
+download_dir = '.'
 
 app = Flask(__name__)
+app.config.update(SERVER_NAME='localhost:5000') # Needed to generate link url on post download.
 auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DONE ON HTTPS CONNECTION
 
 
 
+##################
 ### Data Model ###
-# TODO: need real data to be stored in database
+##################
+# TODO: separate current_jobs dict on a per user basis.
 # Job json format:
 # {
 #   id: x,
@@ -20,7 +26,6 @@ auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DO
 # }
 current_jobs = {}
 
-# Is there a better solution?
 class JobUpdater():
 
   def __init__(self, j_id):
@@ -31,6 +36,21 @@ class JobUpdater():
       current_jobs[self.j_id]['prog'] = ratio
       if ratio == 1:
         current_jobs[self.j_id]['done'] = True
+        with app.app_context():
+          #print(current_app.name) Need app context to generate link url.
+          current_jobs[self.j_id]['link'] = url_for('get_file', j_id=self.j_id, _external=True)
+
+
+
+##################
+### Exceptions ###
+##################
+class ProcessException(Exception):
+
+  def __init__(self, code, message=None):
+    self.code = code
+    self.msg = message
+
 
 
 ########################
@@ -49,11 +69,18 @@ def make_public_job(j_id):
       new_job[field] = job[field]
   return new_job
 
+def extract_v_id(link):
+  if len(link) == 11:
+    return link
+  match = re.search('www.youtube.com/watch\?v=(.{'+str(v_id_len)+'})$', link)
+  if not match:
+    raise ProcessException(400)
+  return match.group(1)
+
 def gen_job_id(v_id):
   j_id = ''
   for c in v_id:
     j_id += str(ord(c))
-  print(j_id)
   return j_id
 
 def spawn_job(v_id):
@@ -66,29 +93,35 @@ def spawn_job(v_id):
     'done': False,
     'link': ''
   }
+  if j_id in current_jobs:
+    raise ProcessException(409, 'Job already processing.')
   current_jobs[j_id] = job
   updater = JobUpdater(j_id)
-  label = ripper.getaudio(v_id, cb=updater.update)
-  if 'ERROR:' in label:
+  try:
+    label = ripper.getaudio(v_id, cb=updater.update)
+  except Exception as e:
     current_jobs.pop(j_id)
-    result = label
+    raise ProcessException(400, e.args[0])
   else:
     current_jobs[j_id]['label'] = label
-    result = 'SUCCESS:'
-  return result, j_id
+  return j_id
 
 
 
 ######################
 ### Error Handlers ###
 ######################
-@app.errorhandler(404)
-def not_found(error):
-  return make_response(jsonify({'error': 'Not found'}), 404)
-
 @app.errorhandler(400)
 def bad_request(error):
-  return make_response(jsonify({'error': 'Bad request'}), 400)
+  return make_response(jsonify({'error': 'Bad request', 'desc':error.description}), 400)
+
+@app.errorhandler(404)
+def not_found(error):
+  return make_response(jsonify({'error': 'Not found', 'desc':error.description}), 404)
+
+@app.errorhandler(409)
+def request_conflict(error):
+  return make_response(jsonify({'error': 'Request conflict', 'desc':error.description}), 409)
 
 
 
@@ -121,9 +154,11 @@ def logout():
 def create_job():
   if not request.json or not 'v_id' in request.json:
     abort(400)
-  result, j_id = spawn_job(request.json['v_id'])
-  if 'ERROR' in result:
-    abort(400) # TODO: pass error info to client.
+  try:
+    v_id = extract_v_id(request.json['v_id'])
+    j_id = spawn_job(v_id)
+  except ProcessException as e:
+    abort(e.code, e.msg)
   return jsonify({'job': make_public_job(j_id)}), 201
 
 # Read All
@@ -142,6 +177,15 @@ def get_job(j_id):
   except KeyError:
     abort(404)
   return jsonify({'job': make_public_job(str(j_id))})
+
+@app.route('/infinote/api/v1.0/jobs/<int:j_id>/link', methods=['GET'])
+#@auth.login_required
+def get_file(j_id):
+  try:
+    job = current_jobs[str(j_id)]
+  except KeyError:
+    abort(404)
+  return 'SOOooooon'
 
 ## Update
 #@app.route('/infinote/api/v1.0/jobs/<int:job_id>', methods=['PUT'])

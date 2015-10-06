@@ -60,17 +60,17 @@ def getaudio(url, path=".", cb=progress_cb):
     except ValueError as err:
       # invalid v_id
       print(err.args)
-      return 'ERROR: '+err.args[0]
+      raise err
     except OSError as err:
       # invalid full youtube url
       print(err.args)
-      return 'ERROR: '+err.args[0]
+      raise err
     except Exception as err:
       # unknown error
       print(type(err))
       print(err.args)
       print(err)
-      return 'ERROR: An unknown error occurred.'
+      raise err
 
     # Generate file name & path.
     audio = video.getbestaudio()
