@@ -1,10 +1,13 @@
 import pafy
 import re
 import os.path
+import threading
 
-# Look for these words within brackets/parenthesis. 
-bracket_keywords=('monstercat', 'release', 'official', 'music', 'video', 'audio')
 
+
+####################
+### Text Parsing ###
+####################
 def parsechannel(text):
     t = re.sub('vevo$', '', text, flags=re.I) # Remove trailing 'vevo'
     t = re.sub('tv$', '', t, flags=re.I) # Dido for 'tv'
@@ -13,6 +16,9 @@ def parsechannel(text):
     return t
 
 def parsetitle(text):
+    # Look for these words within brackets/parenthesis. 
+    bracket_keywords=('monstercat', 'release', 'official', 'music', 'video', 'audio')
+
     splits = re.split(r'-', text)
     for i in range(len(splits)):
         splits[i] = re.sub('^\[.*\]\s*', '', splits[i]) # Remove anything in brackets at the very beginning.
@@ -25,22 +31,30 @@ def parsetitle(text):
     clean_string = ' - '.join(splits) # Join together new string
     return clean_string
 
-status_string = ('  {:,} Bytes [{:.2%}] received. Rate: [{:4.0f} '
-                                 'KB/s].  ETA: [{:.0f} secs]')
 
+
+###################
+### Downloading ###
+###################
 def progress_cb(total, recvd, ratio, rate, eta):
+    status_string = ('  {:,} Bytes [{:.2%}] received. Rate: [{:4.0f} '
+                                 'KB/s].  ETA: [{:.0f} secs]')
     prg_stats = (recvd, ratio, rate, eta)
     status = status_string.format(*prg_stats)
     print(status)
 
-def getaudio(url, path="."):
+def download(audio_stream, filepath, callback):
+    print('START DOWNLOAD')
+    audio_stream.download(filepath=filepath, quiet=True, callback=callback)
+    print('FINISHED DOWNLOAD')
+
+def getaudio(url, path=".", cb=progress_cb):
     if 'www.' in url and 'www.youtube.com/watch?v=' not in url:
       print('ERROR: Url does not point to youtube.')
       return 'ERROR: Url does not point to youtube.'
 
     # Can take 11 char video id or full link
     # Fails silently when using full url to non-youtube site
-    # TODO: some error handling for not found needed
     try:
       video = pafy.new(url)
     except ValueError as err:
@@ -51,32 +65,35 @@ def getaudio(url, path="."):
       # invalid full youtube url
       print(err.args)
       return 'ERROR: '+err.args[0]
-    except:
+    except Exception as err:
       # unknown error
       print(type(err))
       print(err.args)
       print(err)
       return 'ERROR: An unknown error occurred.'
 
-#    print(video.username)
-    filename = parsetitle(video.title)
+    # Generate file name & path.
     audio = video.getbestaudio()
-
+    filename = parsetitle(video.title)
     path = os.path.abspath(path)
     if not os.path.isdir(path):
         path='.'
     path +='/'+filename+'.'+audio.extension
-#    print(path)
 
-    # TODO: kick this off to another thread with .ogg tagging abilities
-    audio.download(filepath=path, quiet=True, callback=progress_cb)
+    # Kick off actual downloading onto another thread.
+    t = threading.Thread(target=download, args=(audio, path, cb))
+    t.start()
 
-    print(filename)
     return filename
 
+
+
+############
+### Main ###
+############
 if __name__ == "__main__":
     url = "https://www.youtube.com/watch?v=3hlZQuAR7KI"
-    getaudio(url, ".")
+    getaudio(url)
     
     #### Test text ####
     #text="[Future Bass] - Grant Bowtie - High Tide [Monstercat Release]"
@@ -95,18 +112,18 @@ if __name__ == "__main__":
     #
     #### End Test ####
     
-    chnl1="UKF Dubstep"
-    chnl2="UKF Drum & Bass"
-    chnl3="UKF"
-    chnl4="Monstercat"
-    chnl5="MeekMillTV"
-    chnl6="TaylorSwiftVEVO"
-    chnl7="Iron Maiden"
-    chnl8="Ryan Lewis Test"
-    
-    chnl_array=(chnl1,chnl2,chnl3,chnl4,chnl5,chnl6,chnl7, chnl8)
-    folders = []
-    
-    for i in range(len(chnl_array)):
-        folders.append(parsechannel(chnl_array[i]))
-        print(folders[i])
+#    chnl1="UKF Dubstep"
+#    chnl2="UKF Drum & Bass"
+#    chnl3="UKF"
+#    chnl4="Monstercat"
+#    chnl5="MeekMillTV"
+#    chnl6="TaylorSwiftVEVO"
+#    chnl7="Iron Maiden"
+#    chnl8="Ryan Lewis Test"
+#    
+#    chnl_array=(chnl1,chnl2,chnl3,chnl4,chnl5,chnl6,chnl7, chnl8)
+#    folders = []
+#    
+#    for i in range(len(chnl_array)):
+#        folders.append(parsechannel(chnl_array[i]))
+#        print(folders[i])
