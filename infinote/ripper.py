@@ -48,7 +48,7 @@ def download(audio_stream, filepath, callback):
     audio_stream.download(filepath=filepath, quiet=True, callback=callback)
     print('FINISHED DOWNLOAD')
 
-def getaudio(url, path=".", cb=progress_cb):
+def getaudio(url, path=".", callback=progress_cb):
     if 'www.' in url and 'www.youtube.com/watch?v=' not in url:
       print('ERROR: Url does not point to youtube.')
       return 'ERROR: Url does not point to youtube.'
@@ -59,11 +59,11 @@ def getaudio(url, path=".", cb=progress_cb):
       video = pafy.new(url)
     except ValueError as err:
       # invalid v_id
-      print(err.args)
+      #print(err.args)
       raise err
     except OSError as err:
       # invalid full youtube url
-      print(err.args)
+      #print(err.args)
       raise err
     except Exception as err:
       # unknown error
@@ -75,16 +75,17 @@ def getaudio(url, path=".", cb=progress_cb):
     # Generate file name & path.
     audio = video.getbestaudio()
     filename = parsetitle(video.title)
+    ext = audio.extension
     path = os.path.abspath(path)
     if not os.path.isdir(path):
         path='.'
-    path +='/'+filename+'.'+audio.extension
+    path +='/'+filename+'.'+ext
 
     # Kick off actual downloading onto another thread.
-    t = threading.Thread(target=download, args=(audio, path, cb))
+    t = threading.Thread(target=download, args=(audio, path, callback))
     t.start()
 
-    return filename
+    return filename, ext
 
 
 

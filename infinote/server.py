@@ -1,11 +1,11 @@
-from flask import Flask, jsonify, abort, make_response, request, url_for, current_app
+from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory
 from flask.ext.httpauth import HTTPBasicAuth
 import ripper, re
 
 v_id_len = 11
-download_dir = '.'
+download_dir = 'output' # relative to app.
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/'+download_dir)
 app.config.update(SERVER_NAME='localhost:5000') # Needed to generate link url on post download.
 auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DONE ON HTTPS CONNECTION
 
@@ -36,8 +36,8 @@ class JobUpdater():
       current_jobs[self.j_id]['prog'] = ratio
       if ratio == 1:
         current_jobs[self.j_id]['done'] = True
+        # Need app context to generate link url.
         with app.app_context():
-          #print(current_app.name) Need app context to generate link url.
           current_jobs[self.j_id]['link'] = url_for('get_file', j_id=self.j_id, _external=True)
 
 
@@ -89,21 +89,24 @@ def spawn_job(v_id):
     'id': j_id,
     'v_id': v_id,
     'label': '',
+    'ext': '',
     'prog': 0.00,
     'done': False,
     'link': ''
+    # TODO: add Date-time? So we can clean up abandoned jobs?
   }
   if j_id in current_jobs:
     raise ProcessException(409, 'Job already processing.')
   current_jobs[j_id] = job
   updater = JobUpdater(j_id)
   try:
-    label = ripper.getaudio(v_id, cb=updater.update)
+    label, ext = ripper.getaudio(v_id, path=download_dir, callback=updater.update)
   except Exception as e:
     current_jobs.pop(j_id)
     raise ProcessException(400, e.args[0])
   else:
     current_jobs[j_id]['label'] = label
+    current_jobs[j_id]['ext'] = ext
   return j_id
 
 
@@ -178,6 +181,7 @@ def get_job(j_id):
     abort(404)
   return jsonify({'job': make_public_job(str(j_id))})
 
+# Get File
 @app.route('/infinote/api/v1.0/jobs/<int:j_id>/link', methods=['GET'])
 #@auth.login_required
 def get_file(j_id):
@@ -185,7 +189,7 @@ def get_file(j_id):
     job = current_jobs[str(j_id)]
   except KeyError:
     abort(404)
-  return 'SOOooooon'
+  return send_from_directory(download_dir, job['label']+'.'+job['ext'], as_attachment=True)
 
 ## Update
 #@app.route('/infinote/api/v1.0/jobs/<int:job_id>', methods=['PUT'])
