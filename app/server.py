@@ -1,12 +1,13 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory
 from flask.ext.httpauth import HTTPBasicAuth
-import ripper, re
+from app import infinote, ripper
+import re
 
 v_id_len = 11
-download_dir = 'output' # relative to app.
+download_dir = infinote.config['DOWNLOAD_DIR'] #'output' # relative to app.
 
-app = Flask(__name__, static_url_path='/'+download_dir)
-app.config.update(SERVER_NAME='localhost:5000') # Needed to generate link url on post download.
+#app = Flask(__name__, static_url_path='/'+download_dir)
+#infinote.config.update(SERVER_NAME='localhost:5000') # Needed to generate link url on post download.
 auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DONE ON HTTPS CONNECTION
 
 
@@ -24,11 +25,16 @@ auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DO
 #   done: false,
 #   link: https://[domain]/xxxxxx
 # }
+data = {
+    'userid': 0,
+    'jobs': {}
+}
 current_jobs = {}
 
 class JobUpdater():
 
-  def __init__(self, j_id):
+  def __init__(self, u_id, j_id):
+    self.u_id = u_id
     self.j_id = j_id
 
   def update(self, total, recvd, ratio, rate, eta):
@@ -37,7 +43,7 @@ class JobUpdater():
       if ratio == 1:
         current_jobs[self.j_id]['done'] = True
         # Need app context to generate link url.
-        with app.app_context():
+        with infinote.app_context():
           current_jobs[self.j_id]['link'] = url_for('get_file', j_id=self.j_id, _external=True)
 
 
@@ -98,7 +104,7 @@ def spawn_job(v_id):
   if j_id in current_jobs:
     raise ProcessException(409, 'Job already processing.')
   current_jobs[j_id] = job
-  updater = JobUpdater(j_id)
+  updater = JobUpdater(0, j_id)
   try:
     label, ext = ripper.getaudio(v_id, path=download_dir, callback=updater.update)
   except Exception as e:
@@ -114,15 +120,15 @@ def spawn_job(v_id):
 ######################
 ### Error Handlers ###
 ######################
-@app.errorhandler(400)
+@infinote.errorhandler(400)
 def bad_request(error):
   return make_response(jsonify({'error': 'Bad request', 'desc':error.description}), 400)
 
-@app.errorhandler(404)
+@infinote.errorhandler(404)
 def not_found(error):
   return make_response(jsonify({'error': 'Not found', 'desc':error.description}), 404)
 
-@app.errorhandler(409)
+@infinote.errorhandler(409)
 def request_conflict(error):
   return make_response(jsonify({'error': 'Request conflict', 'desc':error.description}), 409)
 
@@ -131,6 +137,14 @@ def request_conflict(error):
 ######################
 ### AUTHENTICATION ###
 ######################
+@auth.verify_password
+def verify_password(username, password):
+  user = User.query.filter_by(username = username).first()
+  if not user or not user.verify_password(password):
+    return False
+  g.user = user
+  return True
+
 @auth.get_password
 def get_password(username):
   # TODO use real username/password -- user/pass database?
@@ -142,7 +156,7 @@ def get_password(username):
 def unauthorized():
   return make_response(jsonify({'error': 'Unauthorized access'}), 401) # Use 403 instead of 401 to prevent auth pop-ups on client.
 
-@app.route('/infinote/api/v1.0/logout', methods=['GET'])
+@infinote.route('/infinote/api/v1.0/logout', methods=['GET'])
 def logout():
   return make_response(jsonify({'success': 'Logged out'}), 401)
 
@@ -151,8 +165,13 @@ def logout():
 ############
 ### CRUD ###
 ############
+@infinote.route('/')
+@infinote.route('/index')
+def test():
+  return 'Hello World!'
+
 # Create
-@app.route('/infinote/api/v1.0/jobs', methods=['POST'])
+@infinote.route('/infinote/api/v1.0/jobs', methods=['POST'])
 #@auth.login_required
 def create_job():
   if not request.json or not 'v_id' in request.json:
@@ -165,14 +184,14 @@ def create_job():
   return jsonify({'job': make_public_job(j_id)}), 201
 
 # Read All
-@app.route('/infinote/api/v1.0/jobs', methods=['GET'])
+@infinote.route('/infinote/api/v1.0/jobs', methods=['GET'])
 #@auth.login_required
 def get_jobs():
 #  print(request.headers)
   return jsonify({'jobs': [make_public_job(j_id) for j_id in current_jobs.keys()]})
 
 # Read x
-@app.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['GET'])
+@infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['GET'])
 #@auth.login_required
 def get_job(j_id):
   try:
@@ -182,7 +201,7 @@ def get_job(j_id):
   return jsonify({'job': make_public_job(str(j_id))})
 
 # Get File
-@app.route('/infinote/api/v1.0/jobs/<int:j_id>/link', methods=['GET'])
+@infinote.route('/infinote/api/v1.0/jobs/<int:j_id>/link', methods=['GET'])
 #@auth.login_required
 def get_file(j_id):
   try:
@@ -213,7 +232,7 @@ def get_file(j_id):
 #  return jsonify({'job': make_public_job(job['id'])})
 
 # Delete
-@app.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['DELETE'])
+@infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['DELETE'])
 #@auth.login_required
 def delete_job(j_id):
   try:
