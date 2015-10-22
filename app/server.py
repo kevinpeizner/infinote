@@ -1,13 +1,12 @@
-from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory
+from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory, g
 from flask.ext.httpauth import HTTPBasicAuth
 from app import infinote, ripper
-import re
+import re, pyotp
 
 v_id_len = 11
 download_dir = infinote.config['DOWNLOAD_DIR'] #'output' # relative to app.
-
-#app = Flask(__name__, static_url_path='/'+download_dir)
-#infinote.config.update(SERVER_NAME='localhost:5000') # Needed to generate link url on post download.
+otp_count = 0
+hotp = pyotp.HOTP(infinote.config['OPT_SECRET'])
 auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DONE ON HTTPS CONNECTION
 
 
@@ -140,17 +139,27 @@ def request_conflict(error):
 @auth.verify_password
 def verify_password(username, password):
   user = User.query.filter_by(username = username).first()
-  if not user or not user.verify_password(password):
-    return False
-  g.user = user
+  if not user:
+    return False # TODO: error handling for non-existant user?
+  if not user.verify_password(password):
+    return False # TODO: error handling for incorrect password?
+  g.user = user # TODO: g is in app context?
   return True
 
-@auth.get_password
-def get_password(username):
-  # TODO use real username/password -- user/pass database?
-  if username == 'admin':
-    return 'pass'
-  return None
+def verify_otp(code):
+  global otp_count
+  result = hotp.verify(code, otp_count)
+  if result:
+    otp_count += 1
+  return result
+
+
+#@auth.get_password
+#def get_password(username):
+#  # TODO use real username/password -- user/pass database?
+#  if username == 'admin':
+#    return 'pass'
+#  return None
 
 @auth.error_handler
 def unauthorized():
@@ -162,14 +171,53 @@ def logout():
 
 
 
-############
-### CRUD ###
-############
+################
+### TESTING  ###
+################
 @infinote.route('/')
 @infinote.route('/index')
 def test():
   return 'Hello World!'
 
+
+
+#####################
+### App Managment ###
+#####################
+# Sync OTP count
+@infinote.route('/infinote/api/v1.0/sync', methods=['GET', 'POST'])
+# @auth.login_required
+# TODO: check for admin user
+def count_sync():
+  global otp_count
+  if request.method == 'POST':
+    if not request.json or not 'cnt' in request.json:
+      abort(400, 'Must supply cnt.')
+    otp_count = request.json['cnt']
+  return jsonify({'cnt':otp_count}), 200
+
+
+
+#################
+### User Init ###
+#################
+# Init User
+@infinote.route('/infinote/api/v1.0/init', methods=['POST'])
+def user_init():
+  if not request.json or not 'otp' in request.json:
+    abort(400, 'One time passcode required.')
+  if verify_otp(request.json['otp']):
+    # TODO: user_id and pass generation needed.
+    pass
+  else:
+    abort(401, 'Invalid otp.')
+  return 'Valid OTP!'
+
+
+
+################
+### API CRUD ###
+################
 # Create
 @infinote.route('/infinote/api/v1.0/jobs', methods=['POST'])
 #@auth.login_required
@@ -244,7 +292,16 @@ def delete_job(j_id):
 
 
 
+####@infinote.before_first_request
+def setup(*args, **kwargs):
+  global otp_count
+  otp_count = 0
+  print(otp_count)
+
+setup()
+
 if __name__ == '__main__':
-  app.run(debug=True)
+  infinote = Flask(__name__)
+  infinote.run(debug=True)
 
 
