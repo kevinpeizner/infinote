@@ -44,28 +44,30 @@ def progress_cb(total, recvd, ratio, rate, eta):
     status = status_string.format(*prg_stats)
     print(status)
 
-def convert_file(original_file, new_file, options={'format':'mp3','audio':{'codec':'mp3','channels':2}}):
-    c = Converter()
-    conversion = c.convert(original_file, new_file+'.mp3', options, timeout=None)
-# Let's assume we'll always have 2 channels.
-#    channels = info.audio.channels
-# Sample-rate & bitrate are automatically set to reasonable levels
-# if omitted.
-#    samplerate = info.audio.audio_samplerate
-#    bitrate = audio_stream.rawbitrate
-    for prog in conversion:
-      print(prog)
-
-
-def download(audio_stream, filepath, callback, convert=False):
+def download(audio_stream, filepath, callback=progress_cb):
     print('START DOWNLOAD')
     audio_stream.download(filepath=filepath, quiet=True, callback=callback)
-    filename, ext = os.path.splitext(filepath)
-    if convert and ext is not '.mp3':
-      convert_file(filepath, filename)
     print('FINISHED DOWNLOAD')
 
-def getaudio(url, path=".", callback=progress_cb):
+def convert_file(original_file, new_file, callback=None):
+    print('START CONVERSION')
+    c = Converter()
+    # Let's assume we'll always have 2 channels.
+    # Let's also assume we alway want .mp3
+    # Sample-rate & bitrate are automatically set to reasonable levels
+    # if omitted.
+    options={'format':'mp3','audio':{'codec':'mp3','channels':2}}
+    conversion = c.convert(original_file, new_file, options, timeout=None)
+    if callback:
+      for prog in conversion:
+          callback(prog/100)
+      callback(1)
+    else:
+      for x in conversion:
+        pass
+    print('FINISHED CONVERSION')
+
+def getaudio(url, directory=".", tracker=None):
     if 'www.' in url and 'www.youtube.com/watch?v=' not in url:
       print('ERROR: Url does not point to youtube.')
       return 'ERROR: Url does not point to youtube.'
@@ -74,33 +76,44 @@ def getaudio(url, path=".", callback=progress_cb):
     # Fails silently when using full url to non-youtube site
     try:
       video = pafy.new(url)
-    except ValueError as err:
-      # invalid v_id
-      #print(err.args)
-      raise err
-    except OSError as err:
-      # invalid full youtube url
-      #print(err.args)
-      raise err
     except Exception as err:
+      # invalid v_id
+      # invalid full youtube url
       # unknown error
-      print(type(err))
-      print(err.args)
-      print(err)
-      raise err
+      tracker.handle_error(err)
+      return
 
     # Generate file name & path.
-    audio = video.getbestaudio()
-    filename = parsetitle(video.title)
-    ext = audio.extension
-    path = os.path.abspath(path)
-    if not os.path.isdir(path):
-        path='.'
-    path +='/'+filename+'.'+ext
+    try:
+      audio = video.getbestaudio()
+      filename = parsetitle(video.title)
+      tracker.set_attribute('label', filename)
+      ext = audio.extension
+      download_dir = os.path.abspath(directory)
+      if not os.path.isdir(download_dir):
+        download_dir='.'
+      filepath = download_dir+'/'+filename+'.'+ext
+    except Exception as err:
+      tracker.handle_error(err)
 
-    # Kick off actual downloading onto another thread.
-    t = threading.Thread(target=download, args=(audio, path, callback, True))
-    t.start()
+    # Download
+    try:
+      tracker.update_stage('download')
+      download(audio, filepath, tracker.download_prog)
+    except Exception as err:
+      tracker.handle_error(err)
+
+    # Convert
+    if ext is not 'mp3':
+      try:
+        tracker.update_stage('convert')
+        mp3_filepath = download_dir+'/'+filename+'.mp3'
+        convert_file(filepath, mp3_filepath, tracker.convert_prog)
+      except Exception as err:
+        tracker.handle_error(err)
+
+    # Done
+    tracker.update_stage('done')
 
     return filename, ext
 

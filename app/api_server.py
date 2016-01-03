@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory, g
 from flask.ext.httpauth import HTTPBasicAuth
 from app import infinote, ripper
-import re, pyotp
+import re, pyotp, threading
 
 v_id_len = 11
 download_dir = infinote.root_path+infinote.config['DOWNLOAD_DIR']
@@ -30,20 +30,40 @@ data = {
 }
 current_jobs = {}
 
-class JobUpdater():
+class JobTracker():
 
   def __init__(self, u_id, j_id):
     self.u_id = u_id
     self.j_id = j_id
 
-  def update(self, total, recvd, ratio, rate, eta):
+  def set_attribute(self, key, value):
     if current_jobs and current_jobs[self.j_id]:
-      current_jobs[self.j_id]['prog'] = ratio
-      if ratio == 1:
-        current_jobs[self.j_id]['done'] = True
+      if key in current_jobs[self.j_id]:
+        current_jobs[self.j_id][key] = value
+
+  def update_stage(self, stage):
+    if current_jobs and current_jobs[self.j_id]:
+      self.set_attribute('stage', stage) # TODO: sanity check value?
+      if stage is 'done':
         # Need app context to generate link url.
         with infinote.app_context():
-          current_jobs[self.j_id]['link'] = url_for('get_file', j_id=self.j_id, _external=True)
+          self.set_attribute('link', url_for('get_file', j_id=self.j_id, _external=True))
+
+  def download_prog(self, total, recvd, ratio, rate, eta):
+    if current_jobs and current_jobs[self.j_id]:
+      self.set_attribute('prog', ratio)
+
+  def convert_prog(self, ratio):
+    if current_jobs and current_jobs[self.j_id]:
+      self.set_attribute('prog', ratio)
+
+  def handle_error(self, exception):
+    if current_jobs and current_jobs[self.j_id]:
+      print('GOT AN ERROR!')
+      print(exception)
+      current_jobs.pop(self.j_id)
+
+
 
 
 
@@ -94,9 +114,8 @@ def spawn_job(v_id):
     'id': j_id,
     'v_id': v_id,
     'label': '',
-    'ext': '',
+    'stage': 'init', # init, download, convert, done
     'prog': 0.00,
-    'done': False,
     'link': ''
     # TODO: add Date-time? So we can clean up abandoned jobs? EX: processed job result never retrieved.
   }
@@ -104,15 +123,15 @@ def spawn_job(v_id):
   if j_id in current_jobs:
     raise ProcessException(409, 'Job is already being processed.')
   current_jobs[j_id] = job
-  updater = JobUpdater(0, j_id)
+  tracker = JobTracker(0, j_id)
   try:
-    label, ext = ripper.getaudio(v_id, path=download_dir, callback=updater.update)
+    # Kick off actual downloading onto another thread.
+    t = threading.Thread(target=ripper.getaudio, args=(v_id, download_dir, tracker))
+    t.start()
   except Exception as e:
+    print('GOT EXCEPTION!')
     current_jobs.pop(j_id)
     raise ProcessException(400, e.args[0])
-  else:
-    current_jobs[j_id]['label'] = label
-    current_jobs[j_id]['ext'] = ext
   return j_id
 
 
