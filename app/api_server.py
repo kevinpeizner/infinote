@@ -4,7 +4,7 @@ from app import infinote, ripper
 import re, pyotp
 
 v_id_len = 11
-download_dir = infinote.config['DOWNLOAD_DIR'] #'output' # relative to app.
+download_dir = infinote.root_path+infinote.config['DOWNLOAD_DIR']
 otp_count = 0
 hotp = pyotp.HOTP(infinote.config['OPT_SECRET'])
 auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DONE ON HTTPS CONNECTION
@@ -79,7 +79,7 @@ def extract_v_id(link):
     return link
   match = re.search('www.youtube.com/watch\?v=(.{'+str(v_id_len)+'})$', link)
   if not match:
-    raise ProcessException(400)
+    raise ProcessException(400, "Unable to extract v_id.")
   return match.group(1)
 
 def gen_job_id(v_id):
@@ -98,10 +98,11 @@ def spawn_job(v_id):
     'prog': 0.00,
     'done': False,
     'link': ''
-    # TODO: add Date-time? So we can clean up abandoned jobs?
+    # TODO: add Date-time? So we can clean up abandoned jobs? EX: processed job result never retrieved.
   }
+  # TODO: separate jobs into per user containers!
   if j_id in current_jobs:
-    raise ProcessException(409, 'Job already processing.')
+    raise ProcessException(409, 'Job is already being processed.')
   current_jobs[j_id] = job
   updater = JobUpdater(0, j_id)
   try:
@@ -256,7 +257,7 @@ def get_file(j_id):
     job = current_jobs[str(j_id)]
   except KeyError:
     abort(404)
-  return send_from_directory(download_dir, job['label']+'.'+job['ext'], as_attachment=True)
+  return send_from_directory(download_dir, job['label']+'.mp3', as_attachment=True)
 
 ## Update
 #@app.route('/infinote/api/v1.0/jobs/<int:job_id>', methods=['PUT'])

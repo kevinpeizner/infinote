@@ -2,6 +2,7 @@ import pafy
 import re
 import os.path
 import threading
+from converter import Converter
 
 
 
@@ -43,9 +44,25 @@ def progress_cb(total, recvd, ratio, rate, eta):
     status = status_string.format(*prg_stats)
     print(status)
 
-def download(audio_stream, filepath, callback):
+def convert_file(original_file, new_file, options={'format':'mp3','audio':{'codec':'mp3','channels':2}}):
+    c = Converter()
+    conversion = c.convert(original_file, new_file+'.mp3', options, timeout=None)
+# Let's assume we'll always have 2 channels.
+#    channels = info.audio.channels
+# Sample-rate & bitrate are automatically set to reasonable levels
+# if omitted.
+#    samplerate = info.audio.audio_samplerate
+#    bitrate = audio_stream.rawbitrate
+    for prog in conversion:
+      print(prog)
+
+
+def download(audio_stream, filepath, callback, convert=False):
     print('START DOWNLOAD')
     audio_stream.download(filepath=filepath, quiet=True, callback=callback)
+    filename, ext = os.path.splitext(filepath)
+    if convert and ext is not '.mp3':
+      convert_file(filepath, filename)
     print('FINISHED DOWNLOAD')
 
 def getaudio(url, path=".", callback=progress_cb):
@@ -82,7 +99,7 @@ def getaudio(url, path=".", callback=progress_cb):
     path +='/'+filename+'.'+ext
 
     # Kick off actual downloading onto another thread.
-    t = threading.Thread(target=download, args=(audio, path, callback))
+    t = threading.Thread(target=download, args=(audio, path, callback, True))
     t.start()
 
     return filename, ext
