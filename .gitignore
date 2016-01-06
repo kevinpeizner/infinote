@@ -5,3 +5,4 @@
 *.swp
 *.db
 db_repository/
+app/output/
