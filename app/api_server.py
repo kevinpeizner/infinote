@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory, g
 from flask.ext.httpauth import HTTPBasicAuth
 from app import infinote, ripper
+from datetime import datetime
 import re, pyotp, threading
 
 v_id_len = 11
@@ -44,6 +45,7 @@ class JobTracker():
   def update_stage(self, stage):
     if current_jobs and current_jobs[self.j_id]:
       self.set_attribute('stage', stage) # TODO: sanity check value?
+      self.set_attribute('timestamp', datetime.utcnow().timestamp())
       if stage is 'done':
         # Need app context to generate link url.
         with infinote.app_context():
@@ -52,10 +54,12 @@ class JobTracker():
   def download_prog(self, total, recvd, ratio, rate, eta):
     if current_jobs and current_jobs[self.j_id]:
       self.set_attribute('prog', ratio)
+      self.set_attribute('timestamp', datetime.utcnow().timestamp())
 
   def convert_prog(self, ratio):
     if current_jobs and current_jobs[self.j_id]:
       self.set_attribute('prog', ratio)
+      self.set_attribute('timestamp', datetime.utcnow().timestamp())
 
   def handle_error(self, exception):
     if current_jobs and current_jobs[self.j_id]:
@@ -116,8 +120,8 @@ def spawn_job(v_id):
     'label': '',
     'stage': 'init', # init, download, convert, done
     'prog': 0.00,
-    'link': ''
-    # TODO: add Date-time? So we can clean up abandoned jobs? EX: processed job result never retrieved.
+    'link': '',
+    'timestamp': datetime.utcnow().timestamp() # TODO: add mechanism to clean up stale jobs. Define what a stale job is.
   }
   # TODO: separate jobs into per user containers!
   if j_id in current_jobs:
@@ -125,7 +129,7 @@ def spawn_job(v_id):
   current_jobs[j_id] = job
   tracker = JobTracker(0, j_id)
   try:
-    # Kick off actual downloading onto another thread.
+    # Kick off downloading onto another thread.
     t = threading.Thread(target=ripper.getaudio, args=(v_id, download_dir, tracker))
     t.start()
   except Exception as e:
