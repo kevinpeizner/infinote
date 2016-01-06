@@ -1,8 +1,9 @@
 {
-  id: x,
-  v_id: ''
-  title: '',
-  prog: x.xx,
-  done: false,
-  link: https://[domain]/xxxxxx
+  'uri': '',
+  'v_id': '',
+  'label': '',
+  'stage': '',
+  'prog': 0.0,
+  'link': '',
+  'timestamp': 0.0
 }

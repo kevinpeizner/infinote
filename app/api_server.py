@@ -17,13 +17,14 @@ auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DO
 ##################
 # TODO: separate current_jobs dict on a per user basis.
 # Job json format:
-# {
-#   id: x,
-#   v_id: '',
-#   label: '',
-#   prog: x.xx,
-#   done: false,
-#   link: https://[domain]/xxxxxx
+# job = {
+#   'id': j_id,
+#   'v_id': v_id,
+#   'label': '',
+#   'stage': 'init', # init, download, convert, done
+#   'prog': 0.00,
+#   'link': '',
+#   'timestamp': datetime.utcnow().timestamp()
 # }
 data = {
     'userid': 0,
