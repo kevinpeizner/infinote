@@ -68,7 +68,7 @@ def convert_file(original_file, new_file, callback=None):
     print('FINISHED CONVERSION')
 
 def getaudio(url, directory=".", tracker=None):
-    if 'www.' in url and 'www.youtube.com/watch?v=' not in url:
+    if '.com' in url and 'www.youtube.com/watch?v=' not in url:
       print('ERROR: Url does not point to youtube.')
       return 'ERROR: Url does not point to youtube.'
 
