@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory, g
 from flask.ext.httpauth import HTTPBasicAuth
-from app import infinote, ripper
+from app import infinote, db, ripper
+from app.models import User, Job
 from datetime import datetime
 import re, pyotp, threading
 
@@ -171,14 +172,6 @@ def verify_password(username, password):
   g.user = user # TODO: g is in app context?
   return True
 
-def verify_otp(code):
-  global otp_count
-  result = hotp.verify(code, otp_count)
-  if result:
-    otp_count += 1
-  return result
-
-
 #@auth.get_password
 #def get_password(username):
 #  # TODO use real username/password -- user/pass database?
@@ -204,6 +197,10 @@ def logout():
 def test():
   return 'Hello World!'
 
+@infinote.route('/infinote/api/v1.0/auth_test')
+@auth.login_required
+def auth_test():
+  return 'Auth Success! Got User {}'.format(g.user.username)
 
 
 #####################
@@ -223,20 +220,48 @@ def count_sync():
 
 
 
-#################
-### User Init ###
-#################
-# Init User
-@infinote.route('/infinote/api/v1.0/init', methods=['POST'])
-def user_init():
-  if not request.json or not 'otp' in request.json:
-    abort(400, 'One time passcode required.')
-  if verify_otp(request.json['otp']):
-    # TODO: user_id and pass generation needed.
-    pass
-  else:
-    abort(401, 'Invalid otp.')
-  return 'Valid OTP!'
+#########################
+### USER REGISTRATION ###
+#########################
+# Validate one time passcode.
+def verify_otp(code):
+  global otp_count
+  result = hotp.verify(code, otp_count)
+  if result:
+    otp_count += 1
+  return result
+
+# Validate registration.
+def validate_registration(json):
+  if not 'otp' in json:
+    raise ProcessException(400, 'One time passcode required.')
+  if not 'name' in json:
+    raise ProcessException(400, 'Name required.')
+  if not 'password' in json:
+    raise ProcessException(400, 'Password required.')
+  if not 'email' in json:
+    raise ProcessException(400, 'Email required.')
+  if not verify_otp(json['otp']):
+    raise ProcessException(401, 'Invalid OTP')
+  return True
+
+# Register User.
+@infinote.route('/infinote/api/v1.0/register', methods=['POST'])
+def register():
+  if not request.json:
+    abort(400, 'Invalid request.')
+  try:
+    if validate_registration(request.json):
+      new_user = User(request.json['name'], request.json['email'])
+      new_user.hash_password(request.json['password'])
+      print(new_user)
+      db.session.add(new_user)
+      db.session.commit()
+    else:
+      pass # TODO: anything useful? exception should take care of things.
+  except ProcessException as e:
+    abort(e.code, e.msg)
+  return make_response(jsonify({'success':'Registration successful'}), 200)
 
 
 

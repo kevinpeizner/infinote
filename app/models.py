@@ -5,16 +5,16 @@ from passlib.apps import custom_app_context as pwd_context
 class User(db.Model):
   __tablename__ = 'user'
   id = db.Column(db.Integer, primary_key=True)
-  name = db.Column(db.String(64), index=True, unique=True)
+  username = db.Column(db.String(64), index=True, unique=True)
   email = db.Column(db.String(64), index=True, unique=True)
   p_hash = db.Column(db.String(128))
   registration_ts = db.Column(db.DateTime)
   jobs = db.relationship('Job', backref='user', lazy='dynamic')
 
-  def __init__(self, name, email, password):
-    self.name = name
+  def __init__(self, username, email):
+    self.username = username
     self.email = email
-    self.password = password
+#    self.p_hash = self.hash_password(password)
     self.registration_ts = datetime.utcnow()
 
   def hash_password(self, password):
@@ -24,7 +24,7 @@ class User(db.Model):
     return pwd_context.verify(password, self.p_hash)
 
   def __repr__(self):
-    return '<User {}: p_hash - {}>'.format(self.name, self.p_hash)
+    return '<User {}: p_hash - {}>'.format(self.username, self.p_hash)
 
 class Job(db.Model):
   id = db.Column(db.Integer, primary_key=True)
