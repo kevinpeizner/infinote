@@ -1,41 +1,55 @@
 #!/usr/bin/env python
 
-import os, inspect
-import unittest
+import os, json, unittest
+from flask import Flask, jsonify
+from flask.ext.testing import TestCase
 from config import basedir
 from app import infinote, db
 from app.models import User, Job
 
-class TestCases(unittest.TestCase):
+class TestCases(TestCase):
+
+  def create_app(self):
+    test_app = Flask(__name__)
+    test_app.config['TESTING']= True
+    test_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'test.db')
+    return test_app
 
   def setUp(self):
-    infinote.config['TESTING']= True
-    infinote.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'test.db')
-    self.app = infinote.test_client()
+    self.test_client = infinote.test_client()
     db.create_all()
 
   def tearDown(self):
     db.session.remove()
     db.drop_all()
 
+  def getJson(self, resp):
+    return json.loads(resp.get_data().decode('ascii'))
+
   def test_root_page(self):
-    # recv is a flask.wrappers.Response object.
-    recv = self.app.get('/')
-    self.assertEqual(b'Hello World!', recv.get_data())
-    self.assertEqual(200, recv.status_code)
-    self.assertEqual('text/html', recv.mimetype)
+    # resp is a flask.wrappers.Response object.
+    resp = self.test_client.get('/')
+    self.assert200(resp)
+    self.assertEqual(b'Hello World!', resp.get_data())
+    self.assertEqual('text/html', resp.mimetype)
 
   def test_index_page(self):
-    # recv is a flask.wrappers.Response object.
-    recv = self.app.get('/index')
-    self.assertEqual(b'Hello World!', recv.get_data())
-    self.assertEqual(200, recv.status_code)
-    self.assertEqual('text/html', recv.mimetype)
+    # resp is a flask.wrappers.Response object.
+    resp = self.test_client.get('/index')
+    self.assert200(resp)
+    self.assertEqual(b'Hello World!', resp.get_data())
+    self.assertEqual('text/html', resp.mimetype)
 
   def test_jobs_page_no_jobs(self):
-    recv = self.app.get('/infinote/api/v1.0/jobs')
-    self.assertEqual(200, recv.status_code)
-    self.assertEqual('application/json', recv.mimetype)
+    expected_resp = {
+        "jobs": []
+    }
+
+    resp = self.test_client.get('/infinote/api/v1.0/jobs')
+    self.assert200(resp)
+    self.assertEqual('application/json', resp.mimetype)
+    self.assertEqual(expected_resp, self.getJson(resp))
+
 
 if __name__ == '__main__':
   unittest.main()
