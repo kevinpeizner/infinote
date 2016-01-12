@@ -21,18 +21,21 @@ class TestCases(unittest.TestCase):
   def test_root_page(self):
     # recv is a flask.wrappers.Response object.
     recv = self.app.get('/')
-    self.assertEqual(recv.get_data(), b'Hello World!')
-    self.assertEqual(recv.status_code, 200)
+    self.assertEqual(b'Hello World!', recv.get_data())
+    self.assertEqual(200, recv.status_code)
+    self.assertEqual('text/html', recv.mimetype)
 
   def test_index_page(self):
     # recv is a flask.wrappers.Response object.
     recv = self.app.get('/index')
-    self.assertEqual(recv.get_data(), b'Hello World!')
-    self.assertEqual(recv.status_code, 200)
+    self.assertEqual(b'Hello World!', recv.get_data())
+    self.assertEqual(200, recv.status_code)
+    self.assertEqual('text/html', recv.mimetype)
 
   def test_jobs_page_no_jobs(self):
     recv = self.app.get('/infinote/api/v1.0/jobs')
-    self.assertEqual(recv.status_code, 200)
+    self.assertEqual(200, recv.status_code)
+    self.assertEqual('application/json', recv.mimetype)
 
 if __name__ == '__main__':
   unittest.main()
