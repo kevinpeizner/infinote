@@ -33,6 +33,28 @@ data = {
 }
 current_jobs = {}
 
+class CurrentJobs():
+
+  def __init__(self):
+    self.jobs = {}
+
+  def get_all(self):
+    return self.jobs
+
+  def get(self, j_id):
+    return self.jobs.get(j_id, None)
+
+  def add(self, j_id, job):
+    if self.get(j_id) is not None:
+      return False
+    else:
+      self.jobs[j_id] = job
+      return True
+
+  def delete(self, j_id):
+    return self.jobs.pop(j_id, None)
+
+
 class JobTracker():
 
   def __init__(self, u_id, j_id):
