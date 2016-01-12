@@ -27,11 +27,6 @@ auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DO
 #   'link': '',
 #   'timestamp': datetime.utcnow().timestamp()
 # }
-data = {
-    'userid': 0,
-    'jobs': {}
-}
-current_jobs = {}
 
 class CurrentJobs():
 
@@ -54,6 +49,11 @@ class CurrentJobs():
   def delete(self, j_id):
     return self.jobs.pop(j_id, None)
 
+data = {
+    'userid': 0,
+    'jobs': {}
+}
+current_jobs = CurrentJobs()
 
 class JobTracker():
 
@@ -110,17 +110,17 @@ class ProcessException(Exception):
 ### Helper Functions ###
 ########################
 def make_public_job(j_id):
-  new_job = {}
-  job = current_jobs[j_id]
+  pub_job = {}
+  job = current_jobs.get(j_id)
   if not job:
     abort(404)
     return {'error': 'Not found'}
   for field in job:
     if field == 'id':
-      new_job['uri'] = url_for('get_job', j_id=job['id'], _external=True)
+      pub_job['uri'] = url_for('get_job', j_id=job['id'], _external=True)
     else:
-      new_job[field] = job[field]
-  return new_job
+      pub_job[field] = job[field]
+  return pub_job
 
 def extract_v_id(link):
   if len(link) == 11:
@@ -369,11 +369,13 @@ def setup(*args, **kwargs):
   global otp_count
   otp_count = 0
   print(otp_count)
+  print('Setup complete!')
 
 setup()
 
 if __name__ == '__main__':
   infinote = Flask(__name__)
   infinote.run(debug=True)
+  print("I'm alive!")
 
 
