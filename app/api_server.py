@@ -122,13 +122,14 @@ def make_public_job(j_id):
       pub_job[field] = job[field]
   return pub_job
 
+# For now we are only interested in youtube.com links.
 def extract_v_id(link):
   if len(link) == 11:
     return link
-  match = re.search('www.youtube.com/watch\?v=(.{'+str(v_id_len)+'})$', link)
+  match = re.search('(www.)?youtube.com/watch\?v=(?P<v_id>.{'+str(v_id_len)+'})$', link)
   if not match:
-    raise ProcessException(400, "Unable to extract v_id.")
-  return match.group(1)
+    return None
+  return match.group('v_id')
 
 def gen_job_id(v_id):
   j_id = ''
@@ -136,7 +137,11 @@ def gen_job_id(v_id):
     j_id += str(ord(c))
   return j_id
 
-def spawn_job(v_id):
+def spawn_job(link):
+  v_id = extract_v_id(link)
+  if not v_id:
+    raise ProcessException(400, "Unable to extract v_id.")
+
   j_id = gen_job_id(v_id)
   job = {
     'id': j_id,
@@ -297,8 +302,7 @@ def create_job():
   if not request.json or not 'v_id' in request.json:
     abort(400)
   try:
-    v_id = extract_v_id(request.json['v_id'])
-    j_id = spawn_job(v_id)
+    j_id = spawn_job(request.json['v_id'])
   except ProcessException as e:
     abort(e.code, e.msg)
   return jsonify({'job': make_public_job(j_id)}), 201

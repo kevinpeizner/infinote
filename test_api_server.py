@@ -79,7 +79,32 @@ class HelperTestCases(unittest.TestCase):
     expected['uri']='http://mock_job_link'
     expected.pop('id')
     self.assertEqual(expected, res)
+
+  def test_extract_v_id(self):
+    # case 1
+    expected = test_data = '11111111111'
+    res = api_server.extract_v_id(test_data)
+    self.assertEqual(expected, res)
     
+    # case 2
+    test_data = 'www.youtube.com/watch?v=11111111111'
+    res = api_server.extract_v_id(test_data)
+    self.assertEqual(expected, res)
+
+    # case 3
+    test_data = 'youtube.com/watch?v=11111111111'
+    res = api_server.extract_v_id(test_data)
+    self.assertEqual(expected, res)
+
+    # case 4
+    test_data = 'youtu.com/watch?v=11111111111'
+    res = api_server.extract_v_id(test_data)
+    self.assertIsNone(res)
+
+    # case 5
+    test_data = ''
+    res = api_server.extract_v_id(test_data)
+    self.assertIsNone(res)
 
 
 
