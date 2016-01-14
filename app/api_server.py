@@ -133,16 +133,20 @@ def extract_v_id(link):
 
 def gen_job_id(v_id):
   j_id = ''
-  for c in v_id:
-    j_id += str(ord(c))
+  if isinstance(v_id, str):
+    for c in v_id:
+      j_id += str(ord(c))
   return j_id
 
 def spawn_job(link):
   v_id = extract_v_id(link)
   if not v_id:
-    raise ProcessException(400, "Unable to extract v_id.")
+    raise ProcessException(400, "Unable to extract video id.")
 
   j_id = gen_job_id(v_id)
+  if not j_id:
+    raise ProcessException(400, "Unable to generate job id.")
+
   job = {
     'id': j_id,
     'v_id': v_id,

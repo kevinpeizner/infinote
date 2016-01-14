@@ -107,29 +107,18 @@ class HelperTestCases(unittest.TestCase):
     self.assertIsNone(res)
 
   def test_gen_job_id(self):
+    # case 1
+    test_data = 123456789
+    expected = ''
+    res = api_server.gen_job_id(test_data)
+    self.assertEqual(expected, res)
 
+    # case 2
     for x in range(ord('!'), ord('~')+1):
       test_data = chr(x)
       res = api_server.gen_job_id(test_data)
       self.assertEqual(str(x), res)
 
-    # case 1
-    test_data = '0123456789-'
-    expected = '4849505152535455565745'
-    res = api_server.gen_job_id(test_data)
-    self.assertEqual(expected, res)
-
-    # case 2
-    test_data = 'abcdefghijklmnopqrstuvwxyz'
-    expected = '979899100101102103104105106107108109110111112113114115116117118119120121122'
-    res = api_server.gen_job_id(test_data)
-    self.assertEqual(expected, res)
-
-    # case 3
-    test_data = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    expected = '6566676869707172737475767778798081828384858687888990'
-    res = api_server.gen_job_id(test_data)
-    self.assertEqual(expected, res)
 
 
 class APITestCases(TestCase):
