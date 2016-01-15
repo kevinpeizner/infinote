@@ -200,19 +200,12 @@ def verify_password(username, password):
     return False # TODO: error handling for non-existant user?
   if not user.verify_password(password):
     return False # TODO: error handling for incorrect password?
-  g.user = user # TODO: g is in app context?
+  g.user = user
   return True
-
-#@auth.get_password
-#def get_password(username):
-#  # TODO use real username/password -- user/pass database?
-#  if username == 'admin':
-#    return 'pass'
-#  return None
 
 @auth.error_handler
 def unauthorized():
-  return make_response(jsonify({'error': 'Unauthorized access'}), 401) # Use 403 instead of 401 to prevent auth pop-ups on client.
+  return make_response(jsonify({'error': 'Unauthorized access'}), 401) # TODO: Use 403 instead of 401 to prevent auth pop-ups on client.
 
 @infinote.route('/infinote/api/v1.0/logout', methods=['GET'])
 def logout():
@@ -313,10 +306,10 @@ def create_job():
 
 # Read All
 @infinote.route('/infinote/api/v1.0/jobs', methods=['GET'])
-#@auth.login_required
+@auth.login_required
 def get_jobs():
 #  print(request.headers)
-  return jsonify({'jobs': [make_public_job(j_id) for j_id in current_jobs.keys()]})
+  return jsonify({'jobs': [make_public_job(j_id) for j_id in current_jobs.get_all().keys()]})
 
 # Read x
 @infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['GET'])

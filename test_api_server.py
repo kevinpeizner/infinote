@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, json, unittest
+import os, json, unittest, base64
 from datetime import datetime
 from unittest.mock import MagicMock
 from flask import Flask, jsonify
@@ -119,6 +119,8 @@ class HelperTestCases(unittest.TestCase):
       res = api_server.gen_job_id(test_data)
       self.assertEqual(str(x), res)
 
+  def test_spaw_job(self):
+    pass
 
 
 class APITestCases(TestCase):
@@ -140,6 +142,19 @@ class APITestCases(TestCase):
   def getJson(self, resp):
     return json.loads(resp.get_data().decode('ascii'))
 
+  def gen_user(self, username):
+    email = '{}@email.com'.format(username)
+    password = '{}_password'.format(username)
+    u = User(username, email)
+    u.hash_password(password)
+    db.session.add(u)
+    db.session.commit()
+    return u, password
+
+  def gen_auth_header(self, username, password):
+    b = '{0}:{1}'.format(username, password).encode('utf-8')
+    return {'Authorization': 'Basic ' + base64.b64encode(b).decode('utf-8')}
+
   def test_root_page(self):
     # resp is a flask.wrappers.Response object.
     resp = self.test_client.get('/')
@@ -155,12 +170,24 @@ class APITestCases(TestCase):
     self.assertEqual('text/html', resp.mimetype)
 
   def test_jobs_page_no_jobs(self):
-    self.skipTest('Switching to CurrentJobs class.')
+    # case 1
+    expected_resp = {
+        'error': 'Unauthorized access'
+    }
+
+    resp = self.test_client.get('/infinote/api/v1.0/jobs')
+    self.assert401(resp)
+    self.assertEqual('application/json', resp.mimetype)
+    self.assertEqual(expected_resp, self.getJson(resp))
+
+    # case 2
     expected_resp = {
         "jobs": []
     }
 
-    resp = self.test_client.get('/infinote/api/v1.0/jobs')
+    u, password = self.gen_user('tom')
+    header=self.gen_auth_header(u.username, password)
+    resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
     self.assert200(resp)
     self.assertEqual('application/json', resp.mimetype)
     self.assertEqual(expected_resp, self.getJson(resp))
