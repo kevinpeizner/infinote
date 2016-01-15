@@ -192,6 +192,17 @@ class APITestCases(TestCase):
     self.assertEqual('application/json', resp.mimetype)
     self.assertEqual(expected_resp, self.getJson(resp))
 
+    # case 3
+    expected_resp = {
+        'error': 'Unauthorized access'
+    }
+
+    header=self.gen_auth_header(u.username, 'incorrect')
+    resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
+    self.assert401(resp)
+    self.assertEqual('application/json', resp.mimetype)
+    self.assertEqual(expected_resp, self.getJson(resp))
+
 #  def test_single_job_page_bad_id(self):
 #    resp = self.test_client.get('/infinote/api/v1.0/jobs/0')
 #    self.assert400(resp)
