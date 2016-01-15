@@ -149,7 +149,8 @@ class APITestCases(TestCase):
     u.hash_password(password)
     db.session.add(u)
     db.session.commit()
-    return u, password
+    user = User.query.filter_by(username = username).first()
+    return user, password
 
   def gen_auth_header(self, username, password):
     b = '{0}:{1}'.format(username, password).encode('utf-8')
@@ -170,38 +171,42 @@ class APITestCases(TestCase):
     self.assertEqual('text/html', resp.mimetype)
 
   def test_jobs_page_no_jobs(self):
-    # case 1
+    u, password = self.gen_user('tom')
     expected_resp = {
         'error': 'Unauthorized access'
     }
 
+    # case 1 - no auth header
     resp = self.test_client.get('/infinote/api/v1.0/jobs')
     self.assert401(resp)
     self.assertEqual('application/json', resp.mimetype)
     self.assertEqual(expected_resp, self.getJson(resp))
 
-    # case 2
+    # case 2 - incorrect password
+    header=self.gen_auth_header(u.username, 'incorrect')
+    resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
+    self.assert401(resp)
+    self.assertEqual('application/json', resp.mimetype)
+    self.assertEqual(expected_resp, self.getJson(resp))
+
+    # case 3 - incorrect username
+    header=self.gen_auth_header('incorrect', password)
+    resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
+    self.assert401(resp)
+    self.assertEqual('application/json', resp.mimetype)
+    self.assertEqual(expected_resp, self.getJson(resp))
+
     expected_resp = {
-        "jobs": []
+        'jobs': []
     }
 
-    u, password = self.gen_user('tom')
+    # case 4
     header=self.gen_auth_header(u.username, password)
     resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
     self.assert200(resp)
     self.assertEqual('application/json', resp.mimetype)
     self.assertEqual(expected_resp, self.getJson(resp))
 
-    # case 3
-    expected_resp = {
-        'error': 'Unauthorized access'
-    }
-
-    header=self.gen_auth_header(u.username, 'incorrect')
-    resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
-    self.assert401(resp)
-    self.assertEqual('application/json', resp.mimetype)
-    self.assertEqual(expected_resp, self.getJson(resp))
 
 #  def test_single_job_page_bad_id(self):
 #    resp = self.test_client.get('/infinote/api/v1.0/jobs/0')
