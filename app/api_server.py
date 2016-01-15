@@ -272,6 +272,7 @@ def validate_registration(json):
   return True
 
 # Register User.
+# TODO: Should I worry about CRSF? Does the OTP take care of this? -- even though that wasn't the intended purpose.
 @infinote.route('/infinote/api/v1.0/register', methods=['POST'])
 def register():
   if not request.json:
@@ -310,7 +311,6 @@ def create_job():
 @infinote.route('/infinote/api/v1.0/jobs', methods=['GET'])
 @auth.login_required
 def get_jobs():
-#  print(request.headers)
   return jsonify({'jobs': [make_public_job(j_id) for j_id in current_jobs.get_all().keys()]})
 
 # Read x
