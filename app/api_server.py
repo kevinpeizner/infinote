@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory, g
 from flask.ext.httpauth import HTTPBasicAuth
 from app import infinote, db, ripper
-from app.models import User, Job
+from app.models import User, Job, RuntimeData
 from datetime import datetime
 import re, pyotp, threading
 
@@ -10,35 +10,12 @@ download_dir = infinote.root_path+infinote.config['DOWNLOAD_DIR']
 otp_count = 0
 hotp = pyotp.HOTP(infinote.config['OPT_SECRET'])
 auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DONE ON HTTPS CONNECTION
-
+runtime_data = None
 
 
 ##################
 ### Data Model ###
 ##################
-class CurrentJobs():
-
-  def __init__(self):
-    self.jobs = {}
-
-  def get_all(self):
-    return self.jobs
-
-  def get(self, j_id):
-    return self.jobs.get(j_id, None)
-
-  def add(self, j_id, job):
-    if self.get(j_id) is not None:
-      return False
-    else:
-      self.jobs[j_id] = job
-      return True
-
-  def delete(self, j_id):
-    return self.jobs.pop(j_id, None)
-
-
-
 class JobTracker():
   """ Class used to track a given job's progress"""
 
@@ -118,7 +95,7 @@ def spawn_job(user, link):
   if not v_id:
     raise ProcessException(400, "Unable to extract video id.")
 
-  j_id, ts_start = RealtimeData.gen_job_data(user.id, v_id)
+  j_id, ts_start = runtime_data.createJob(user.id, v_id)
   if not j_id or not ts_start:
     # TODO: think abort error handling a bit more.
     return None
@@ -336,8 +313,10 @@ def delete_job(j_id):
 
 ####@infinote.before_first_request
 def setup(*args, **kwargs):
+  global runtime_data
   global otp_count
   otp_count = 0
+  runtime_data = RuntimeData()
   print('OTP Count:', otp_count)
   print('Setup complete!')
 

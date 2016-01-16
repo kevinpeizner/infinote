@@ -73,7 +73,7 @@ class RuntimeData():
   default_values = ('', '', '', 'init', 0.00, '', '')
   valid_stages = ('init', 'download', 'convert', 'done')
 
-  def __init__():
+  def __init__(self):
     self.data = {}
 
   # User Layer
