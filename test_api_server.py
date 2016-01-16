@@ -14,11 +14,23 @@ from app.models import User, Job, RuntimeData
 class RuntimeDataTestCases(unittest.TestCase):
 
   def setUp(self):
-    self.dummy_jobs = CurrentJobs()
+    self.dummy_rtd = RuntimeData()
 
   def tearDown(self):
     pass
 
+  def test_gen_job_id(self):
+    # case 1
+    test_data = 123456789
+    expected = ''
+    res = self.dummy_rtd._gen_job_id(test_data)
+    self.assertEqual(expected, res)
+
+    # case 2
+    for x in range(ord('!'), ord('~')+1):
+      test_data = chr(x)
+      res = self.dummy_rtd._gen_job_id(test_data)
+      self.assertEqual(str(x), res)
 
 
 
@@ -84,20 +96,6 @@ class HelperTestCases(unittest.TestCase):
     test_data = ''
     res = api_server.extract_v_id(test_data)
     self.assertIsNone(res)
-
-  def test_gen_job_id(self):
-    self.skipTest('Refactoring to make use of RuntimeData class.')
-    # case 1
-    test_data = 123456789
-    expected = ''
-    res = api_server.gen_job_id(test_data)
-    self.assertEqual(expected, res)
-
-    # case 2
-    for x in range(ord('!'), ord('~')+1):
-      test_data = chr(x)
-      res = api_server.gen_job_id(test_data)
-      self.assertEqual(str(x), res)
 
   def test_spaw_job(self):
     self.skipTest('Refactoring to make use of RuntimeData class.')

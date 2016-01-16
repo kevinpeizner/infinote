@@ -98,7 +98,7 @@ class RuntimeData():
     return self.data.pop(u_id, None)
 
   # Job Layer
-  def _gen_job_id(v_id):
+  def _gen_job_id(self, v_id):
     j_id = ''
     if isinstance(v_id, str):
       for c in v_id:
