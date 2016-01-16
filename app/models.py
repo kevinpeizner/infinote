@@ -2,6 +2,7 @@ from app import db
 from datetime import datetime
 from passlib.apps import custom_app_context as pwd_context
 
+
 class User(db.Model):
   __tablename__ = 'user'
   id = db.Column(db.Integer, primary_key=True)
@@ -25,6 +26,7 @@ class User(db.Model):
   def __repr__(self):
     return '<User {}: p_hash - {}>'.format(self.username, self.p_hash)
 
+
 class Job(db.Model):
   id = db.Column(db.Integer, primary_key=True)
   user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -35,10 +37,12 @@ class Job(db.Model):
   def __repr__(self):
     return '<Job {}: User - {}>'.format(self.id, self.user_id)
 
+
 class RuntimeDataException(Exception):
   def __init__(self, code, msg):
     self.code = code
     self.msg = msg
+
 
 class RuntimeData():
   """Class used to manage data that lives mostly outside of the db.
