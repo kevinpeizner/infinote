@@ -14,7 +14,6 @@ class User(db.Model):
   def __init__(self, username, email):
     self.username = username
     self.email = email
-#    self.p_hash = self.hash_password(password)
     self.registration_ts = datetime.utcnow()
 
   def hash_password(self, password):
@@ -34,4 +33,4 @@ class Job(db.Model):
   ts_complete = db.Column(db.DateTime)
 
   def __repr__(self):
-    return '<Job {}: Started - {} Completed - {}>'.format(self.v_id, ts_start, ts_complete)
+    return '<Job {}: User - {}>'.format(self.id, self.user_id)
