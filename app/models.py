@@ -35,6 +35,10 @@ class Job(db.Model):
   def __repr__(self):
     return '<Job {}: User - {}>'.format(self.id, self.user_id)
 
+class RuntimeDataException(Exception):
+  def __init__(self, code, msg):
+    self.code = code
+    self.msg = msg
 
 class RuntimeData():
   """Class used to manage data that lives mostly outside of the db.
@@ -104,18 +108,20 @@ class RuntimeData():
   def createJob(self, u_id, v_id):
     j_id = self.gen_job_id(v_id)
     if not j_id:
-      raise ProcessException(400, 'Unable to generate job id.') #TODO: handle this w/o this exception.
+      raise RuntimeDataException(400, 'Unable to generate job id.') #TODO: handle this w/o this exception.
 
     if self.getJob(u_id, j_id):
-      raise ProcessException(409, 'Job is already being processed.') #TODO: handle this w/o this exception.
+      raise RuntimeException(409, 'Job is already being processed.') #TODO: handle this w/o this exception.
 
     job = dict(zip(valid_keys, default_values))
     job['id'] = j_id
     job['v_id'] = v_id
     job['timestamp'] = datetime.utcnow().timestamp()
 
+    # We should never fail to add a new job at this point,
+    # but let's be smart and check anyways.
     if not self.addNewJob(u_id, j_id, job):
-      raise Exception()
+      raise RuntimeDataException(500, 'Failed to add new job.')
       return '', ''
 
     return j_id, job['timestamp']
