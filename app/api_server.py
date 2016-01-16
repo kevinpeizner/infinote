@@ -16,18 +16,6 @@ auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DO
 ##################
 ### Data Model ###
 ##################
-# TODO: separate current_jobs dict on a per user basis.
-# Job json format:
-# job = {
-#   'id': j_id,
-#   'v_id': v_id,
-#   'label': '',
-#   'stage': 'init', # init, download, convert, done
-#   'prog': 0.00,
-#   'link': '',
-#   'timestamp': datetime.utcnow().timestamp()
-# }
-
 class CurrentJobs():
 
   def __init__(self):
@@ -49,13 +37,10 @@ class CurrentJobs():
   def delete(self, j_id):
     return self.jobs.pop(j_id, None)
 
-data = {
-    'userid': 0,
-    'jobs': {}
-}
-current_jobs = CurrentJobs()
+
 
 class JobTracker():
+  """ Class used to track a given job's progress"""
 
   def __init__(self, u_id, j_id):
     self.u_id = u_id
@@ -90,9 +75,6 @@ class JobTracker():
       print('GOT AN ERROR!')
       print(exception)
       current_jobs.pop(self.j_id)
-
-
-
 
 
 ##################
@@ -131,36 +113,21 @@ def extract_v_id(link):
     return None
   return match.group('v_id')
 
-def gen_job_id(v_id):
-  j_id = ''
-  if isinstance(v_id, str):
-    for c in v_id:
-      j_id += str(ord(c))
-  return j_id
-
-def spawn_job(link):
+def spawn_job(user, link):
   v_id = extract_v_id(link)
   if not v_id:
     raise ProcessException(400, "Unable to extract video id.")
 
-  j_id = gen_job_id(v_id)
-  if not j_id:
-    raise ProcessException(400, "Unable to generate job id.")
+  j_id, ts_start = RealtimeData.gen_job_data(user.id, v_id)
+  if not j_id or not ts_start:
+    # TODO: think abort error handling a bit more.
+    return None
 
-  job = {
-    'id': j_id,
-    'v_id': v_id,
-    'label': '',
-    'stage': 'init', # init, download, convert, done
-    'prog': 0.00,
-    'link': '',
-    'timestamp': datetime.utcnow().timestamp() # TODO: add mechanism to clean up stale jobs. Define what a stale job is.
-  }
-  # TODO: separate jobs into per user containers!
-  if j_id in current_jobs:
-    raise ProcessException(409, 'Job is already being processed.')
-  current_jobs[j_id] = job
-  tracker = JobTracker(0, j_id)
+  j = Job(user=user, v_id=v_id, ts_start=job['timestamp'])
+  db.session.add(j)
+  db.session.commit()
+
+  tracker = JobTracker(user.id, j_id)
   try:
     # Kick off downloading onto another thread.
     t = threading.Thread(target=ripper.getaudio, args=(v_id, download_dir, tracker))
@@ -297,12 +264,12 @@ def register():
 ################
 # Create
 @infinote.route('/infinote/api/v1.0/jobs', methods=['POST'])
-#@auth.login_required
+@auth.login_required
 def create_job():
   if not request.json or not 'v_id' in request.json:
     abort(400)
   try:
-    j_id = spawn_job(request.json['v_id'])
+    j_id = spawn_job(g.user, request.json['v_id'])
   except ProcessException as e:
     abort(e.code, e.msg)
   return jsonify({'job': make_public_job(j_id)}), 201
@@ -371,7 +338,7 @@ def delete_job(j_id):
 def setup(*args, **kwargs):
   global otp_count
   otp_count = 0
-  print(otp_count)
+  print('OTP Count:', otp_count)
   print('Setup complete!')
 
 setup()
