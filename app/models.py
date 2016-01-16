@@ -158,47 +158,9 @@ class RuntimeData():
       return job_data.get(key, None)
 
   def set_attribute(self, u_id, j_id, key, value):
+    # We don't allow adding NEW attributes.
     if not self.get_attribute(u_id, j_id, key) or not value:
       return False
     else:
       self.data[u_id][j_id][key] = value
       return True
-
-
-
-class JobTracker():
-  """ Class used to track a given job's progress"""
-
-  def __init__(self, u_id, j_id):
-    self.u_id = u_id
-    self.j_id = j_id
-
-  def set_attribute(self, key, value):
-    if current_jobs and current_jobs[self.j_id]:
-      if key in current_jobs[self.j_id]:
-        current_jobs[self.j_id][key] = value
-
-  def update_stage(self, stage):
-    if current_jobs and current_jobs[self.j_id]:
-      self.set_attribute('stage', stage) # TODO: sanity check value?
-      self.set_attribute('timestamp', datetime.utcnow().timestamp())
-      if stage is 'done':
-        # Need app context to generate link url.
-        with infinote.app_context():
-          self.set_attribute('link', url_for('get_file', j_id=self.j_id, _external=True))
-
-  def download_prog(self, total, recvd, ratio, rate, eta):
-    if current_jobs and current_jobs[self.j_id]:
-      self.set_attribute('prog', ratio)
-      self.set_attribute('timestamp', datetime.utcnow().timestamp())
-
-  def convert_prog(self, ratio):
-    if current_jobs and current_jobs[self.j_id]:
-      self.set_attribute('prog', ratio)
-      self.set_attribute('timestamp', datetime.utcnow().timestamp())
-
-  def handle_error(self, exception):
-    if current_jobs and current_jobs[self.j_id]:
-      print('GOT AN ERROR!')
-      print(exception)
-      current_jobs.pop(self.j_id)
