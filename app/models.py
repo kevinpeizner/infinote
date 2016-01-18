@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 from passlib.apps import custom_app_context as pwd_context
 
 
@@ -92,7 +92,7 @@ class RuntimeData():
     return self.data.get(u_id, None)
 
   def updateUser(self, u_id, data):
-    if not self.getUser(u_id) or not data:
+    if self.getUser(u_id) is None or not data:
       return False
     else:
       self.data[u_id] = data # TODO: use update() instead?
@@ -115,12 +115,12 @@ class RuntimeData():
       raise RuntimeDataException(400, 'Unable to generate job id.') #TODO: handle this w/o this exception.
 
     if self.getJob(u_id, j_id):
-      raise RuntimeException(409, 'Job is already being processed.') #TODO: handle this w/o this exception.
+      raise RuntimeDataException(409, 'Job is already being processed.') #TODO: handle this w/o this exception.
 
-    job = dict(zip(valid_keys, default_values))
+    job = dict(zip(self.valid_keys, self.default_values))
     job['id'] = j_id
     job['v_id'] = v_id
-    job['timestamp'] = datetime.utcnow().timestamp()
+    job['timestamp'] = datetime.utcnow().replace(tzinfo=timezone.utc).timestamp()
 
     # We should never fail to add a new job at this point,
     # but let's be smart and check anyways.

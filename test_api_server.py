@@ -10,30 +10,6 @@ from app import infinote, db, api_server
 from app.models import User, Job, RuntimeData
 
 
-
-class RuntimeDataTestCases(unittest.TestCase):
-
-  def setUp(self):
-    self.dummy_rtd = RuntimeData()
-
-  def tearDown(self):
-    pass
-
-  def test_gen_job_id(self):
-    # case 1
-    test_data = 123456789
-    expected = ''
-    res = self.dummy_rtd._gen_job_id(test_data)
-    self.assertEqual(expected, res)
-
-    # case 2
-    for x in range(ord('!'), ord('~')+1):
-      test_data = chr(x)
-      res = self.dummy_rtd._gen_job_id(test_data)
-      self.assertEqual(str(x), res)
-
-
-
 class HelperTestCases(unittest.TestCase):
 
   def setUp(self):
@@ -107,7 +83,7 @@ class APITestCases(TestCase):
   def create_app(self):
     test_app = Flask(__name__)
     test_app.config['TESTING']= True
-    test_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'test.db')
+    test_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, '_test.db')
     return test_app
 
   def setUp(self):
@@ -187,11 +163,9 @@ class APITestCases(TestCase):
     self.assertEqual('application/json', resp.mimetype)
     self.assertEqual(expected_resp, self.getJson(resp))
 
-
 #  def test_single_job_page_bad_id(self):
 #    resp = self.test_client.get('/infinote/api/v1.0/jobs/0')
 #    self.assert400(resp)
-
 
 
 if __name__ == '__main__':
