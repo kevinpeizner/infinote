@@ -132,14 +132,22 @@ class RuntimeData():
 
     return j_id, job['timestamp']
 
-  def addNewJob(self, u_id, j_id, data=None):
-    user_data = self.getUser(u_id)
-    if not user_data:
-      user_data = self.addNewUser(u_id)
-    if j_id in user_data:
+  def _is_job_dict(self, d):
+    if not isinstance(d, dict):
       return False
+    if set(d.keys()) ^ set(self.valid_keys):
+      return False
+    return True
+
+  def addNewJob(self, u_id, j_id, data):
+    if not self._is_job_dict(data):
+      return False
+    if self.getUser(u_id) is not None:
+      if self.getJob(u_id, j_id) is not None:
+        return False
     else:
-      return updateUser(u_id, {j_id:data})
+      self.addNewUser(u_id)
+    return self.updateUser(u_id, {j_id:data})
 
   def getJob(self, u_id, j_id):
     user_data = self.getUser(u_id)
