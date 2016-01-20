@@ -92,10 +92,12 @@ class RuntimeData():
     return self.data.get(u_id, None)
 
   def updateUser(self, u_id, data):
-    if self.getUser(u_id) is None or not data:
+    if not isinstance(data, dict) or self.getUser(u_id) is None:
       return False
     else:
-      self.data[u_id] = data # TODO: use update() instead?
+      # Update a user's dictionary of jobs.
+      # Overrides matching jobs and adds new ones.
+      self.data[u_id].update(data)
       return True
 
   def delUser(self, u_id):

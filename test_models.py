@@ -47,12 +47,15 @@ class RuntimeDataTestCases(unittest.TestCase):
       self.assertDictEqual(expected, res)
 
   def test_update_user(self):
-    uid = 1
-    mock_data = {'dummy':'data'}
+    uid = 10
+    dummy_orig_jid = 1
+    dummy_new_jid = 2
+    mock_orig_data = {dummy_orig_jid:'data'}
+    mock_new_data = {dummy_new_jid:dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))}
 
     # case 1 - no user
     self.dummy_rtd.getUser = MagicMock(return_value=None)
-    res = self.dummy_rtd.updateUser(uid, mock_data)
+    res = self.dummy_rtd.updateUser(uid, mock_new_data)
     self.assertFalse(res)
 
     self.dummy_rtd.getUser = MagicMock(return_value={})
@@ -62,10 +65,13 @@ class RuntimeDataTestCases(unittest.TestCase):
     self.assertFalse(res)
 
     # case 3 - happy path
-    res = self.dummy_rtd.updateUser(uid, mock_data)
+    self.dummy_rtd.data = {uid:mock_orig_data}
+    res = self.dummy_rtd.updateUser(uid, mock_new_data)
     self.assertTrue(res)
-    new_data = self.dummy_rtd.data[uid]
-    self.assertDictEqual(mock_data, new_data)
+    data = self.dummy_rtd.data[uid]
+    expected = mock_orig_data.copy()
+    expected.update(mock_new_data)
+    self.assertDictEqual(expected, data)
 
   def test_del_user(self):
     uid = 1
