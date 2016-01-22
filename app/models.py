@@ -157,14 +157,16 @@ class RuntimeData():
       return user_data.get(j_id, None)
 
   def updateJob(self, u_id, j_id, data):
-    if not self.getJob(u_id, j_id) or not data:
+    if not self._is_job_dict(data):
+      return False
+    if self.getJob(u_id, j_id) is None:
       return False
     else:
-      self.data[u_id][j_id] = data # TODO: use update() instead?
+      self.data[u_id][j_id].update(data)
       return True
 
   def delJob(self, u_id, j_id):
-    if not self.getUser(u_id):
+    if self.getUser(u_id) is None:
       return None
     else:
       return self.data[u_id].pop(j_id, None)
@@ -172,14 +174,14 @@ class RuntimeData():
   # Data Layer:
   def get_attribute(self, u_id, j_id, key):
     job_data = self.getJob(u_id, j_id)
-    if not job_data:
+    if job_data is None:
       return None
     else:
       return job_data.get(key, None)
 
   def set_attribute(self, u_id, j_id, key, value):
     # We don't allow adding NEW attributes.
-    if not self.get_attribute(u_id, j_id, key) or not value:
+    if self.get_attribute(u_id, j_id, key) is None or value is None:
       return False
     else:
       self.data[u_id][j_id][key] = value

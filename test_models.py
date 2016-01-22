@@ -228,6 +228,170 @@ class RuntimeDataTestCases(unittest.TestCase):
     self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
     self.dummy_rtd.updateUser.assert_called_once_with(uid, {jid:mock_data})
 
+  def test_get_job(self):
+    uid = 1
+    jid = 5
+    mock_user_data = {}
+    mock_job_data = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+
+    # case 1 - User does not exist
+    self.dummy_rtd.getUser = MagicMock(return_value=None)
+    res = self.dummy_rtd.getJob(uid, jid)
+    self.assertIsNone(res)
+    self.dummy_rtd.getUser.assert_called_once_with(uid)
+
+    self.dummy_rtd.getUser.reset_mock()
+
+    # case 2 - User exists, job does not.
+    self.dummy_rtd.getUser = MagicMock(return_value=mock_user_data)
+    res = self.dummy_rtd.getJob(uid, jid)
+    self.assertIsNone(res)
+    self.dummy_rtd.getUser.assert_called_once_with(uid)
+
+    self.dummy_rtd.getUser.reset_mock()
+
+    # case 3 - User and job exist
+    mock_user_data = {jid:mock_job_data}
+    self.dummy_rtd.getUser = MagicMock(return_value=mock_user_data)
+    res = self.dummy_rtd.getJob(uid, jid)
+    self.assertIsNotNone(res)
+    self.assertDictEqual(mock_job_data, res)
+    self.dummy_rtd.getUser.assert_called_once_with(uid)
+
+  def test_update_job(self):
+    uid = 1
+    jid = 5
+    mock_job_data = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+
+    # case 1 - data is not a job dict
+    self.dummy_rtd._is_job_dict = MagicMock(return_value=False)
+    res = self.dummy_rtd.updateJob(uid, jid, mock_job_data)
+    self.assertFalse(res)
+    self.dummy_rtd._is_job_dict.assert_called_once_with(mock_job_data)
+
+    self.dummy_rtd._is_job_dict.reset_mock()
+
+    # case 2 - data is a job dict, but job doesn't exist
+    self.dummy_rtd._is_job_dict = MagicMock(return_value=True)
+    self.dummy_rtd.getJob = MagicMock(return_value=None)
+    res = self.dummy_rtd.updateJob(uid, jid, mock_job_data)
+    self.assertFalse(res)
+    self.dummy_rtd._is_job_dict.assert_called_once_with(mock_job_data)
+    self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
+
+    self.dummy_rtd._is_job_dict.reset_mock()
+    self.dummy_rtd.getJob.reset_mock()
+
+    # case 3 - data is a job dict and job exists
+    # ...prime the data structure so we can check it at the end.
+    self.dummy_rtd.data = {uid:{jid:{}}}
+    self.dummy_rtd._is_job_dict = MagicMock(return_value=True)
+    self.dummy_rtd.getJob = MagicMock(return_value={})
+    res = self.dummy_rtd.updateJob(uid, jid, mock_job_data)
+    self.assertTrue(res)
+    self.dummy_rtd._is_job_dict.assert_called_once_with(mock_job_data)
+    self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
+    self.assertDictEqual(mock_job_data, self.dummy_rtd.data[uid][jid])
+
+  def test_del_job(self):
+    uid = 1
+    jid = 5
+    mock_job_data = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+
+    # case 1 - User does not exist
+    self.dummy_rtd.getUser = MagicMock(return_value=None)
+    res = self.dummy_rtd.delJob(uid, jid)
+    self.assertIsNone(res)
+    self.dummy_rtd.getUser.assert_called_once_with(uid)
+
+    self.dummy_rtd.getUser.reset_mock()
+
+    # case 2 - User exists, job does not
+    # ...prime the data structure so we can check it at the end.
+    self.dummy_rtd.data = {uid:{}}
+    self.dummy_rtd.getUser = MagicMock(return_value={})
+    res = self.dummy_rtd.delJob(uid, jid)
+    self.assertIsNone(res)
+    self.dummy_rtd.getUser.assert_called_once_with(uid)
+
+    self.dummy_rtd.getUser.reset_mock()
+
+    # case 3 - User and job exist
+    # ...prime the data structure so we can check it at the end.
+    self.dummy_rtd.data = {uid:{jid:mock_job_data}}
+    self.dummy_rtd.getUser = MagicMock(return_value={})
+    res = self.dummy_rtd.delJob(uid, jid)
+    self.assertIsNotNone(res)
+    self.assertDictEqual(mock_job_data, res)
+    self.dummy_rtd.getUser.assert_called_once_with(uid)
+    # check that the job was removed from the data structure
+    self.assertDictEqual({uid:{}}, self.dummy_rtd.data)
+
+  ########################
+  ### Data Layer Tests ###
+  ########################
+  def test_get_attribute(self):
+    uid = 1
+    jid = 5
+    mock_job_data = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+
+    # case 1 - job does not exist
+    self.dummy_rtd.getJob = MagicMock(return_value=None)
+    res = self.dummy_rtd.get_attribute(uid, jid, 'some_key')
+    self.assertIsNone(res)
+    self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
+
+    self.dummy_rtd.getJob.reset_mock()
+
+    # case 2 - job exists, but key does not
+    self.dummy_rtd.getJob = MagicMock(return_value=mock_job_data)
+    res = self.dummy_rtd.get_attribute(uid, jid, 'some_key')
+    self.assertIsNone(res)
+    self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
+
+    self.dummy_rtd.getJob.reset_mock()
+
+    # case 3 - job and key exist
+    self.dummy_rtd.getJob = MagicMock(return_value=mock_job_data)
+    res = self.dummy_rtd.get_attribute(uid, jid, 'stage')
+    self.assertEqual('init', res)
+    self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
+
+  def test_set_attribute(self):
+    uid = 1
+    jid = 5
+    key='stage'
+    value='done'
+    mock_job_data = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+
+    # case 1 - attribute does not exist
+    self.dummy_rtd.get_attribute = MagicMock(return_value=None)
+    res = self.dummy_rtd.set_attribute(uid, jid, key, value)
+    self.assertFalse(res)
+    self.dummy_rtd.get_attribute.assert_called_once_with(uid, jid, key)
+
+    self.dummy_rtd.get_attribute.reset_mock()
+
+    # case 2 - attribute exists, bad value
+    self.dummy_rtd.get_attribute = MagicMock(return_value='init')
+    res = self.dummy_rtd.set_attribute(uid, jid, key, None)
+    self.assertFalse(res)
+    self.dummy_rtd.get_attribute.assert_called_once_with(uid, jid, key)
+
+    self.dummy_rtd.get_attribute.reset_mock()
+
+    # case 3 - attribute exists, good value
+    # ...prime the data structure so we can check it at the end.
+    self.dummy_rtd.data = {uid:{jid:mock_job_data}}
+    self.dummy_rtd.get_attribute = MagicMock(return_value='init')
+    res = self.dummy_rtd.set_attribute(uid, jid, key, value)
+    self.assertTrue(res)
+    expected = mock_job_data
+    expected[key] = value
+    self.assertDictEqual(expected, self.dummy_rtd.data[uid][jid])
+    self.dummy_rtd.get_attribute.assert_called_once_with(uid, jid, key)
+
+
 
 if __name__ == '__main__':
   unittest.main()
