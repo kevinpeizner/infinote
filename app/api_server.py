@@ -68,10 +68,10 @@ class ProcessException(Exception):
 ########################
 ### Helper Functions ###
 ########################
-def make_public_job(j_id):
+def make_public_job(u_id, j_id):
   pub_job = {}
-  job = current_jobs.get(j_id)
-  if not job:
+  job = runtime_data.getJob(u_id, j_id)
+  if job is None:
     abort(404)
     return {'error': 'Not found'}
   for field in job:
@@ -97,7 +97,7 @@ def spawn_job(user, link):
 
   j_id, ts_start = runtime_data.createJob(user.id, v_id)
   if not j_id or not ts_start:
-    # TODO: think abort error handling a bit more.
+    # TODO: think about error handling a bit more.
     return None
 
   j = Job(user=user, v_id=v_id, ts_start=job['timestamp'])
@@ -255,7 +255,13 @@ def create_job():
 @infinote.route('/infinote/api/v1.0/jobs', methods=['GET'])
 @auth.login_required
 def get_jobs():
-  return jsonify({'jobs': [make_public_job(j_id) for j_id in current_jobs.get_all().keys()]})
+  u_id = g.user.id
+  jobs = []
+  user_data = runtime_data.getUser(u_id)
+  if user_data is not None:
+    for j_id in user_data:
+      jobs.append(make_public_job(u_id, j_id))
+  return jsonify({'jobs': jobs})
 
 # Read x
 @infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['GET'])

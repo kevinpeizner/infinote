@@ -19,7 +19,8 @@ class HelperTestCases(unittest.TestCase):
     pass
 
   def test_make_public_job(self):
-    self.skipTest('Refactoring to make use of RuntimeData class.')
+    uid = 1
+    jid = 1234
     mock_ts = datetime.utcnow().timestamp()
     mock_job = {
       'id': 1234,
@@ -32,20 +33,24 @@ class HelperTestCases(unittest.TestCase):
     }
 
     # case 1
-    api_server.current_jobs.get = MagicMock(return_value=None)
+    api_server.runtime_data.getJob = MagicMock(return_value=None)
     api_server.abort = MagicMock()
-    res = api_server.make_public_job(1234)
+    res = api_server.make_public_job(uid, jid)
     api_server.abort.assert_called_with(404)
     self.assertEqual({'error': 'Not found'}, res)
+    api_server.runtime_data.getJob.assert_called_once_with(uid, jid)
+
+    api_server.runtime_data.getJob.reset_mock()
 
     # case 2
-    api_server.current_jobs.get = MagicMock(return_value=mock_job)
+    api_server.runtime_data.getJob = MagicMock(return_value=mock_job)
     api_server.url_for = MagicMock(return_value='http://mock_job_link')
-    res = api_server.make_public_job(1234)
+    res = api_server.make_public_job(uid, jid)
     expected = mock_job
     expected['uri']='http://mock_job_link'
     expected.pop('id')
     self.assertEqual(expected, res)
+    api_server.runtime_data.getJob.assert_called_once_with(uid, jid)
 
   def test_extract_v_id(self):
     # case 1
@@ -94,10 +99,10 @@ class APITestCases(TestCase):
     db.session.remove()
     db.drop_all()
 
-  def getJson(self, resp):
+  def _get_json(self, resp):
     return json.loads(resp.get_data().decode('ascii'))
 
-  def gen_user(self, username):
+  def _gen_user(self, username):
     email = '{}@email.com'.format(username)
     password = '{}_password'.format(username)
     u = User(username, email)
@@ -107,7 +112,7 @@ class APITestCases(TestCase):
     user = User.query.filter_by(username = username).first()
     return user, password
 
-  def gen_auth_header(self, username, password):
+  def _gen_auth_header(self, username, password):
     b = '{0}:{1}'.format(username, password).encode('utf-8')
     return {'Authorization': 'Basic ' + base64.b64encode(b).decode('utf-8')}
 
@@ -126,8 +131,7 @@ class APITestCases(TestCase):
     self.assertEqual('text/html', resp.mimetype)
 
   def test_jobs_page_no_jobs(self):
-    self.skipTest('Refactoring to make use of RuntimeData class.')
-    u, password = self.gen_user('tom')
+    u, password = self._gen_user('tom')
     expected_resp = {
         'error': 'Unauthorized access'
     }
@@ -136,32 +140,32 @@ class APITestCases(TestCase):
     resp = self.test_client.get('/infinote/api/v1.0/jobs')
     self.assert401(resp)
     self.assertEqual('application/json', resp.mimetype)
-    self.assertEqual(expected_resp, self.getJson(resp))
+    self.assertEqual(expected_resp, self._get_json(resp))
 
     # case 2 - incorrect password
-    header=self.gen_auth_header(u.username, 'incorrect')
+    header = self._gen_auth_header(u.username, 'incorrect')
     resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
     self.assert401(resp)
     self.assertEqual('application/json', resp.mimetype)
-    self.assertEqual(expected_resp, self.getJson(resp))
+    self.assertEqual(expected_resp, self._get_json(resp))
 
     # case 3 - incorrect username
-    header=self.gen_auth_header('incorrect', password)
+    header = self._gen_auth_header('incorrect', password)
     resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
     self.assert401(resp)
     self.assertEqual('application/json', resp.mimetype)
-    self.assertEqual(expected_resp, self.getJson(resp))
+    self.assertEqual(expected_resp, self._get_json(resp))
 
     expected_resp = {
         'jobs': []
     }
 
     # case 4
-    header=self.gen_auth_header(u.username, password)
+    header = self._gen_auth_header(u.username, password)
     resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
     self.assert200(resp)
     self.assertEqual('application/json', resp.mimetype)
-    self.assertEqual(expected_resp, self.getJson(resp))
+    self.assertEqual(expected_resp, self._get_json(resp))
 
 #  def test_single_job_page_bad_id(self):
 #    resp = self.test_client.get('/infinote/api/v1.0/jobs/0')
