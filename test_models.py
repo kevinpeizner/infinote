@@ -110,36 +110,36 @@ class RuntimeDataTestCases(unittest.TestCase):
     vid = '2'
 
     # case 1 - bad v_id
-    self.dummy_rtd.gen_job_id = MagicMock(return_value='')
+    self.dummy_rtd._gen_job_id = MagicMock(return_value='')
     self.assertRaises(RuntimeDataException, self.dummy_rtd.createJob, uid, vid) # TODO: check for correct expection?
-    self.dummy_rtd.gen_job_id.assert_called_once_with(vid)
+    self.dummy_rtd._gen_job_id.assert_called_once_with(vid)
 
     # case 2 - job already exists
     jid = 50
-    self.dummy_rtd.gen_job_id = MagicMock(return_value=jid)
+    self.dummy_rtd._gen_job_id = MagicMock(return_value=jid)
     self.dummy_rtd.getJob = MagicMock(return_value={'some':'data'})
     self.assertRaises(RuntimeDataException, self.dummy_rtd.createJob, uid, vid) # TODO: check for correct expection?
-    self.dummy_rtd.gen_job_id.assert_called_once_with(vid)
+    self.dummy_rtd._gen_job_id.assert_called_once_with(vid)
     self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
 
-    self.dummy_rtd.gen_job_id.reset_mock()
+    self.dummy_rtd._gen_job_id.reset_mock()
     self.dummy_rtd.getJob.reset_mock()
 
     # case 3 - failed to add job
-    self.dummy_rtd.gen_job_id = MagicMock(return_value=jid)
+    self.dummy_rtd._gen_job_id = MagicMock(return_value=jid)
     self.dummy_rtd.getJob = MagicMock(return_value=None)
     self.dummy_rtd.addNewJob = MagicMock(return_value=False)
     self.assertRaises(RuntimeDataException, self.dummy_rtd.createJob, uid, vid) # TODO: check for correct expection?
-    self.dummy_rtd.gen_job_id.assert_called_once_with(vid)
+    self.dummy_rtd._gen_job_id.assert_called_once_with(vid)
     self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
     self.dummy_rtd.addNewJob.assert_called_once_with(uid, jid, unittest.mock.ANY)
 
-    self.dummy_rtd.gen_job_id.reset_mock()
+    self.dummy_rtd._gen_job_id.reset_mock()
     self.dummy_rtd.getJob.reset_mock()
     self.dummy_rtd.addNewJob.reset_mock()
 
     # case 4 - happy path
-    self.dummy_rtd.gen_job_id = MagicMock(return_value=jid)
+    self.dummy_rtd._gen_job_id = MagicMock(return_value=jid)
     self.dummy_rtd.getJob = MagicMock(return_value=None)
     self.dummy_rtd.addNewJob = MagicMock(return_value=True)
     start_time = datetime.utcnow()
@@ -148,7 +148,7 @@ class RuntimeDataTestCases(unittest.TestCase):
     self.assertEqual(jid, res_1)
     time = datetime.utcfromtimestamp(res_2)
     assert(start_time < time < end_time)
-    self.dummy_rtd.gen_job_id.assert_called_once_with(vid)
+    self.dummy_rtd._gen_job_id.assert_called_once_with(vid)
     self.dummy_rtd.getJob.assert_called_once_with(uid, jid)
     self.dummy_rtd.addNewJob.assert_called_once_with(uid, jid, unittest.mock.ANY)
 
@@ -391,6 +391,134 @@ class RuntimeDataTestCases(unittest.TestCase):
     self.assertDictEqual(expected, self.dummy_rtd.data[uid][jid])
     self.dummy_rtd.get_attribute.assert_called_once_with(uid, jid, key)
 
+  #######################
+  ### Real World Test ###
+  #######################
+  def test_z_real_world_run(self):
+    uid_1 = 1
+    uid_2 = 2
+    # two users can process the same video
+    vid_1 = '99999999999'
+    vid_2 = '99999999999'
+
+    # Precondition
+    self.assertDictEqual({}, self.dummy_rtd.data)
+
+    # Real world run
+    start_time = datetime.utcnow()
+    jid_1, ts_1 = self.dummy_rtd.createJob(uid_1, vid_1)
+    end_time = datetime.utcnow()
+
+    # Check for correctness after adding user and job.
+    self.assertEqual('5757575757575757575757', jid_1)
+    time_1 = datetime.utcfromtimestamp(ts_1)
+    assert(start_time < time_1 < end_time)
+    expected_job_data_1 = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+    expected_job_data_1['id'] = jid_1
+    expected_job_data_1['v_id'] = vid_1
+    expected_job_data_1['timestamp'] = ts_1
+    expected_user_data_1 = {jid_1: expected_job_data_1}
+    expected_data = {uid_1: expected_user_data_1}
+    self.assertDictEqual(expected_data, self.dummy_rtd.data)
+
+    # Check get and set functions
+    res = self.dummy_rtd.getUser(uid_1)
+    self.assertDictEqual(expected_user_data_1, res)
+
+    res = self.dummy_rtd.getJob(uid_1, jid_1)
+    self.assertDictEqual(expected_job_data_1, res)
+
+    # update job data
+    expected_job_data_1['stage'] = 'done'
+    res = self.dummy_rtd.updateJob(uid_1, jid_1, expected_job_data_1)
+    self.assertTrue(res)
+
+    # verify update to job
+    res = self.dummy_rtd.getJob(uid_1, jid_1)
+    self.assertDictEqual(expected_job_data_1, res)
+
+    # verify update to user
+    expected_user_data_1.update({jid_1:expected_job_data_1})
+    res = self.dummy_rtd.getUser(uid_1)
+    self.assertDictEqual(expected_user_data_1, res)
+
+    # Add second user and job
+    start_time = datetime.utcnow()
+    jid_2, ts_2 = self.dummy_rtd.createJob(uid_2, vid_2)
+    end_time = datetime.utcnow()
+
+    # Check for correctness after adding user and job.
+    self.assertEqual('5757575757575757575757', jid_2)
+    time_2 = datetime.utcfromtimestamp(ts_2)
+    assert(start_time < time_2 < end_time)
+    expected_job_data_2 = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+    expected_job_data_2['id'] = jid_2
+    expected_job_data_2['v_id'] = vid_2
+    expected_job_data_2['timestamp'] = ts_2
+    expected_user_data_2 = {jid_2: expected_job_data_2}
+    expected_data.update({uid_2: expected_user_data_2})
+    self.assertDictEqual(expected_data, self.dummy_rtd.data)
+
+    # Check get and set functions
+    res = self.dummy_rtd.getUser(uid_1)
+    self.assertDictEqual(expected_user_data_1, res)
+    res = self.dummy_rtd.getUser(uid_2)
+    self.assertDictEqual(expected_user_data_2, res)
+
+    res = self.dummy_rtd.getJob(uid_1, jid_1)
+    self.assertDictEqual(expected_job_data_1, res)
+    res = self.dummy_rtd.getJob(uid_2, jid_2)
+    self.assertDictEqual(expected_job_data_2, res)
+
+    # delete user 1
+    expected_del = expected_data.pop(uid_1)
+    res = self.dummy_rtd.delUser(uid_1)
+    self.assertDictEqual(expected_del, res)
+
+    # verify user deletion
+    self.assertDictEqual(expected_data, self.dummy_rtd.data)
+    res = self.dummy_rtd.getUser(uid_1)
+    self.assertIsNone(res)
+
+    # try and fail to add already running job to user 2
+    self.assertRaises(RuntimeDataException, self.dummy_rtd.createJob, uid_2, vid_2)
+
+    # successfully add second job for user 2
+    vid_3 = '00000000000'
+    start_time = datetime.utcnow()
+    jid_3, ts_3 = self.dummy_rtd.createJob(uid_2, vid_3)
+    end_time = datetime.utcnow()
+
+    # Check for correctness after adding user and job.
+    self.assertEqual('4848484848484848484848', jid_3)
+    time_3 = datetime.utcfromtimestamp(ts_3)
+    assert(start_time < time_3 < end_time)
+    expected_job_data_3 = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+    expected_job_data_3['id'] = jid_3
+    expected_job_data_3['v_id'] = vid_3
+    expected_job_data_3['timestamp'] = ts_3
+    expected_user_data_2.update({jid_3: expected_job_data_3})
+    expected_data.update({uid_2: expected_user_data_2})
+    self.assertDictEqual(expected_data, self.dummy_rtd.data)
+
+    # delete job 1 for user 2
+    expected_del = expected_user_data_2.pop(jid_2)
+    res = self.dummy_rtd.delJob(uid_2, jid_2)
+    self.assertDictEqual(expected_del, res)
+
+    # verify job deletion
+    res = self.dummy_rtd.getUser(uid_2)
+    self.assertDictEqual(expected_user_data_2, res)
+    res = self.dummy_rtd.getJob(uid_2, jid_2)
+    self.assertIsNone(res)
+
+    # test get/set attribute
+    new_value = 'new_value'
+    res = self.dummy_rtd.set_attribute(uid_2, jid_3, 'stage', new_value)
+    self.assertTrue(res)
+
+    res = self.dummy_rtd.get_attribute(uid_2, jid_3, 'stage')
+    self.assertEqual(new_value, res)
 
 
 if __name__ == '__main__':

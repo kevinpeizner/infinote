@@ -112,7 +112,7 @@ class RuntimeData():
     return j_id
 
   def createJob(self, u_id, v_id):
-    j_id = self.gen_job_id(v_id)
+    j_id = self._gen_job_id(v_id)
     if not j_id:
       raise RuntimeDataException(400, 'Unable to generate job id.') #TODO: handle this w/o this exception.
 
