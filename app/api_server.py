@@ -68,7 +68,7 @@ class ProcessException(Exception):
 ########################
 ### Helper Functions ###
 ########################
-def make_public_job(u_id, j_id):
+def _make_public_job(u_id, j_id):
   pub_job = {}
   job = runtime_data.getJob(u_id, j_id)
   if job is None:
@@ -82,7 +82,7 @@ def make_public_job(u_id, j_id):
   return pub_job
 
 # For now we are only interested in youtube.com links.
-def extract_v_id(link):
+def _extract_v_id(link):
   if len(link) == 11:
     return link
   match = re.search('(www.)?youtube.com/watch\?v=(?P<v_id>.{'+str(v_id_len)+'})$', link)
@@ -90,8 +90,8 @@ def extract_v_id(link):
     return None
   return match.group('v_id')
 
-def spawn_job(user, link):
-  v_id = extract_v_id(link)
+def _spawn_job(user, link):
+  v_id = _extract_v_id(link)
   if v_id is None or len(v_id) != 11:
     raise ProcessException(400, "Unable to extract video id.")
 
@@ -251,10 +251,10 @@ def create_job():
   if not request.json or not 'v_id' in request.json:
     abort(400)
   try:
-    j_id = spawn_job(g.user, request.json['v_id'])
+    j_id = _spawn_job(g.user, request.json['v_id'])
   except ProcessException as e:
     abort(e.code, e.msg)
-  return jsonify({'job': make_public_job(j_id)}), 201
+  return jsonify({'job': _make_public_job(j_id)}), 201
 
 # Read All
 @infinote.route('/infinote/api/v1.0/jobs', methods=['GET'])
@@ -265,7 +265,7 @@ def get_jobs():
   user_data = runtime_data.getUser(u_id)
   if user_data is not None:
     for j_id in user_data:
-      jobs.append(make_public_job(u_id, j_id))
+      jobs.append(_make_public_job(u_id, j_id))
   return jsonify({'jobs': jobs})
 
 # Read x
@@ -276,7 +276,7 @@ def get_job(j_id):
     job = current_jobs[str(j_id)]
   except KeyError:
     abort(404)
-  return jsonify({'job': make_public_job(str(j_id))})
+  return jsonify({'job': _make_public_job(g.user.id, j_id)})
 
 # Get File
 @infinote.route('/infinote/api/v1.0/jobs/<int:j_id>/link', methods=['GET'])
@@ -307,7 +307,7 @@ def get_file(j_id):
 #  job['label'] = request.json.get('label', job['label'])
 #  job['description'] = request.json.get('description', job['description'])
 #  job['done'] = request.json.get('done', job['done'])
-#  return jsonify({'job': make_public_job(job['id'])})
+#  return jsonify({'job': _make_public_job(job['id'])})
 
 # Delete
 @infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['DELETE'])

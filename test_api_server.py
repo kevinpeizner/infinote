@@ -36,7 +36,7 @@ class HelperTestCases(unittest.TestCase):
     # case 1
     api_server.runtime_data.getJob = MagicMock(return_value=None)
     api_server.abort = MagicMock()
-    res = api_server.make_public_job(uid, jid)
+    res = api_server._make_public_job(uid, jid)
     api_server.abort.assert_called_with(404)
     self.assertEqual({'error': 'Not found'}, res)
     api_server.runtime_data.getJob.assert_called_once_with(uid, jid)
@@ -46,7 +46,7 @@ class HelperTestCases(unittest.TestCase):
     # case 2
     api_server.runtime_data.getJob = MagicMock(return_value=mock_job)
     api_server.url_for = MagicMock(return_value='http://mock_job_link')
-    res = api_server.make_public_job(uid, jid)
+    res = api_server._make_public_job(uid, jid)
     expected = mock_job
     expected['uri']='http://mock_job_link'
     expected.pop('id')
@@ -56,27 +56,27 @@ class HelperTestCases(unittest.TestCase):
   def test_extract_v_id(self):
     # case 1
     expected = test_data = '11111111111'
-    res = api_server.extract_v_id(test_data)
+    res = api_server._extract_v_id(test_data)
     self.assertEqual(expected, res)
     
     # case 2
     test_data = 'www.youtube.com/watch?v=11111111111'
-    res = api_server.extract_v_id(test_data)
+    res = api_server._extract_v_id(test_data)
     self.assertEqual(expected, res)
 
     # case 3
     test_data = 'youtube.com/watch?v=11111111111'
-    res = api_server.extract_v_id(test_data)
+    res = api_server._extract_v_id(test_data)
     self.assertEqual(expected, res)
 
     # case 4
     test_data = 'youtu.com/watch?v=11111111111'
-    res = api_server.extract_v_id(test_data)
+    res = api_server._extract_v_id(test_data)
     self.assertIsNone(res)
 
     # case 5
     test_data = ''
-    res = api_server.extract_v_id(test_data)
+    res = api_server._extract_v_id(test_data)
     self.assertIsNone(res)
 
   def test_spaw_job(self):
@@ -85,24 +85,24 @@ class HelperTestCases(unittest.TestCase):
     link = 'www.youtube.com/watch?v=11111111111'
     v_id = '11111111111'
 
-    # case 1a/1b - extract_v_id fails
-    api_server.extract_v_id = MagicMock(return_value=None)
-    self.assertRaises(ProcessException, api_server.spawn_job, "Don't care", link)
-    api_server.extract_v_id.assert_called_once_with(link)
-    api_server.extract_v_id.reset_mock()
-    api_server.extract_v_id = MagicMock(return_value='2346')
-    self.assertRaises(ProcessException, api_server.spawn_job, "Don't care", link)
-    api_server.extract_v_id.assert_called_once_with(link)
-    api_server.extract_v_id.reset_mock()
+    # case 1a/1b - _extract_v_id fails
+    api_server._extract_v_id = MagicMock(return_value=None)
+    self.assertRaises(ProcessException, api_server._spawn_job, "Don't care", link)
+    api_server._extract_v_id.assert_called_once_with(link)
+    api_server._extract_v_id.reset_mock()
+    api_server._extract_v_id = MagicMock(return_value='2346')
+    self.assertRaises(ProcessException, api_server._spawn_job, "Don't care", link)
+    api_server._extract_v_id.assert_called_once_with(link)
+    api_server._extract_v_id.reset_mock()
 
     # case 2 - createJob fails
-    api_server.extract_v_id = MagicMock(return_value=v_id)
+    api_server._extract_v_id = MagicMock(return_value=v_id)
     api_server.runtime_data.createJob = MagicMock(side_effect=RuntimeDataException(400, 'mock_exception'))
-    self.assertRaises(ProcessException, api_server.spawn_job, u, link)
+    self.assertRaises(ProcessException, api_server._spawn_job, u, link)
     api_server.runtime_data.createJob.assert_called_once_with(u.id, v_id)
-    api_server.extract_v_id.assert_called_once_with(link)
+    api_server._extract_v_id.assert_called_once_with(link)
     api_server.runtime_data.createJob.reset_mock()
-    api_server.extract_v_id.reset_mock()
+    api_server._extract_v_id.reset_mock()
 
 
 class APITestCases(TestCase):
