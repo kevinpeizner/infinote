@@ -138,6 +138,46 @@ class APITestCases(TestCase):
     b = '{0}:{1}'.format(username, password).encode('utf-8')
     return {'Authorization': 'Basic ' + base64.b64encode(b).decode('utf-8')}
 
+  # assumes _gen_user() has been called to add given user to the test db.
+  def _verify_credential_check(self, path, method, username, password):
+    expected_resp = {
+        'error': 'Unauthorized access'
+    }
+
+    if method is 'GET':
+      # case 1 - no auth header
+      resp = self.test_client.get(path)
+      self.assert401(resp)
+      self.assertEqual('application/json', resp.mimetype)
+      self.assertEqual(expected_resp, self._get_json(resp))
+
+      # case 2 - incorrect password
+      header = self._gen_auth_header(username, 'incorrect')
+      resp = self.test_client.get(path, headers=header)
+      self.assert401(resp)
+      self.assertEqual('application/json', resp.mimetype)
+      self.assertEqual(expected_resp, self._get_json(resp))
+
+      # case 3 - incorrect username
+      header = self._gen_auth_header('incorrect', password)
+      resp = self.test_client.get(path, headers=header)
+      self.assert401(resp)
+      self.assertEqual('application/json', resp.mimetype)
+      self.assertEqual(expected_resp, self._get_json(resp))
+
+      # case 4 - happy path
+      header = self._gen_auth_header(username, password)
+      resp = self.test_client.get(path, headers=header)
+      self.assert200(resp)
+      self.assertEqual('application/json', resp.mimetype)
+
+    elif method is 'POST':
+      # TODO
+      pass
+    else:
+      self.fail('Unsupported HTTP method "{}"'.format(method))
+
+
   def test_root_page(self):
     # resp is a flask.wrappers.Response object.
     resp = self.test_client.get('/')
@@ -152,37 +192,16 @@ class APITestCases(TestCase):
     self.assertEqual(b'Hello World!', resp.get_data())
     self.assertEqual('text/html', resp.mimetype)
 
-  def test_jobs_page_no_jobs(self):
+  def test_jobs_page(self):
     u, password = self._gen_user('tom')
-    expected_resp = {
-        'error': 'Unauthorized access'
-    }
-
-    # case 1 - no auth header
-    resp = self.test_client.get('/infinote/api/v1.0/jobs')
-    self.assert401(resp)
-    self.assertEqual('application/json', resp.mimetype)
-    self.assertEqual(expected_resp, self._get_json(resp))
-
-    # case 2 - incorrect password
-    header = self._gen_auth_header(u.username, 'incorrect')
-    resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
-    self.assert401(resp)
-    self.assertEqual('application/json', resp.mimetype)
-    self.assertEqual(expected_resp, self._get_json(resp))
-
-    # case 3 - incorrect username
-    header = self._gen_auth_header('incorrect', password)
-    resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
-    self.assert401(resp)
-    self.assertEqual('application/json', resp.mimetype)
-    self.assertEqual(expected_resp, self._get_json(resp))
-
     expected_resp = {
         'jobs': []
     }
 
-    # case 4
+    # Ensure this endpoint is protected.
+    self._verify_credential_check('/infinote/api/v1.0/jobs', 'GET', u.username, password)
+
+    # case 1 - no jobs
     header = self._gen_auth_header(u.username, password)
     resp = self.test_client.get('/infinote/api/v1.0/jobs', headers=header)
     self.assert200(resp)
