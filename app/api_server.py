@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory, g
 from flask.ext.httpauth import HTTPBasicAuth
 from app import infinote, db, ripper
-from app.models import User, Job, RuntimeData
+from app.models import User, Job, RuntimeData, RuntimeDataException
 from datetime import datetime
 import re, pyotp, threading
 
@@ -92,18 +92,20 @@ def extract_v_id(link):
 
 def spawn_job(user, link):
   v_id = extract_v_id(link)
-  if not v_id:
+  if v_id is None or len(v_id) != 11:
     raise ProcessException(400, "Unable to extract video id.")
 
-  j_id, ts_start = runtime_data.createJob(user.id, v_id)
-  if not j_id or not ts_start:
-    # TODO: think about error handling a bit more.
-    return None
+  try:
+    j_id, ts_start = runtime_data.createJob(user.id, v_id)
+  except RuntimeDataException as e:
+    raise ProcessException(e.code, e.msg)
 
+  # Add job to db.
   j = Job(user=user, v_id=v_id, ts_start=job['timestamp'])
   db.session.add(j)
   db.session.commit()
 
+  # Create JobTracker instance to pass to processing thread.
   tracker = JobTracker(user.id, j_id)
   try:
     # Kick off downloading onto another thread.
@@ -111,7 +113,9 @@ def spawn_job(user, link):
     t.start()
   except Exception as e:
     print('GOT EXCEPTION!')
-    current_jobs.pop(j_id)
+    runtime_data.delJob(user.id, j_id)
+    db.session.delete(j)
+    db.session.commit()
     raise ProcessException(400, e.args[0])
   return j_id
 

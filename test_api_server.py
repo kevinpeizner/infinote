@@ -7,7 +7,8 @@ from flask import Flask, jsonify
 from flask.ext.testing import TestCase
 from config import basedir
 from app import infinote, db, api_server
-from app.models import User, Job, RuntimeData
+from app.api_server import ProcessException
+from app.models import User, Job, RuntimeData, RuntimeDataException
 
 
 class HelperTestCases(unittest.TestCase):
@@ -79,8 +80,29 @@ class HelperTestCases(unittest.TestCase):
     self.assertIsNone(res)
 
   def test_spaw_job(self):
-    self.skipTest('Refactoring to make use of RuntimeData class.')
-    pass
+    u = User('Tom', 'tom@email.com')
+    u.id = 1
+    link = 'www.youtube.com/watch?v=11111111111'
+    v_id = '11111111111'
+
+    # case 1a/1b - extract_v_id fails
+    api_server.extract_v_id = MagicMock(return_value=None)
+    self.assertRaises(ProcessException, api_server.spawn_job, "Don't care", link)
+    api_server.extract_v_id.assert_called_once_with(link)
+    api_server.extract_v_id.reset_mock()
+    api_server.extract_v_id = MagicMock(return_value='2346')
+    self.assertRaises(ProcessException, api_server.spawn_job, "Don't care", link)
+    api_server.extract_v_id.assert_called_once_with(link)
+    api_server.extract_v_id.reset_mock()
+
+    # case 2 - createJob fails
+    api_server.extract_v_id = MagicMock(return_value=v_id)
+    api_server.runtime_data.createJob = MagicMock(side_effect=RuntimeDataException(400, 'mock_exception'))
+    self.assertRaises(ProcessException, api_server.spawn_job, u, link)
+    api_server.runtime_data.createJob.assert_called_once_with(u.id, v_id)
+    api_server.extract_v_id.assert_called_once_with(link)
+    api_server.runtime_data.createJob.reset_mock()
+    api_server.extract_v_id.reset_mock()
 
 
 class APITestCases(TestCase):
