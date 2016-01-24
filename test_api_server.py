@@ -173,6 +173,12 @@ class APITestCases(TestCase):
         self.assert200(resp)
       self.assertEqual('application/json', resp.mimetype)
 
+      # case 5 - Require AUTH header on every request.
+      resp = self.test_client.get(path)
+      self.assert401(resp)
+      self.assertEqual('application/json', resp.mimetype)
+      self.assertEqual(expected_resp, self._get_json(resp))
+
     elif method is 'POST':
       # TODO
       pass
