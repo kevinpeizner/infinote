@@ -119,6 +119,21 @@ def _spawn_job(user, link):
 
 
 
+################
+### TESTING  ###
+################
+@infinote.route('/')
+@infinote.route('/index')
+def test():
+  return 'Hello World!'
+
+@infinote.route('/infinote/api/v1.0/auth_test')
+@auth.login_required
+def auth_test():
+  return 'Auth Success! Got User {}'.format(g.user.username)
+
+
+
 ######################
 ### Error Handlers ###
 ######################
@@ -134,45 +149,6 @@ def not_found(error):
 def request_conflict(error):
   return make_response(jsonify({'error': 'Request conflict', 'desc':error.description}), 409)
 
-
-
-######################
-### AUTHENTICATION ###
-######################
-@auth.verify_password
-def verify_password(username, password):
-  if not username or not password:
-    return False
-  user = User.query.filter_by(username = username).first()
-  if not user:
-    return False # TODO: error handling for non-existant user?
-  if not user.verify_password(password):
-    return False # TODO: error handling for incorrect password?
-  g.user = user
-  return True
-
-@auth.error_handler
-def unauthorized():
-  return make_response(jsonify({'error': 'Unauthorized access'}), 401) # TODO: Use 403 instead of 401 to prevent auth pop-ups on client.
-
-@infinote.route('/infinote/api/v1.0/logout', methods=['GET'])
-def logout():
-  return make_response(jsonify({'success': 'Logged out'}), 401)
-
-
-
-################
-### TESTING  ###
-################
-@infinote.route('/')
-@infinote.route('/index')
-def test():
-  return 'Hello World!'
-
-@infinote.route('/infinote/api/v1.0/auth_test')
-@auth.login_required
-def auth_test():
-  return 'Auth Success! Got User {}'.format(g.user.username)
 
 
 #####################
@@ -235,6 +211,33 @@ def register():
   except ProcessException as e:
     abort(e.code, e.msg)
   return make_response(jsonify({'success':'Registration successful'}), 200)
+
+
+
+######################
+### AUTHENTICATION ###
+######################
+@auth.verify_password
+def verify_password(username, password):
+  if not username or not password:
+    return False
+  user = User.query.filter_by(username = username).first()
+  if not user:
+    return False # TODO: error handling for non-existant user?
+  if not user.verify_password(password):
+    return False # TODO: error handling for incorrect password?
+  g.user = user
+  return True
+
+@auth.error_handler
+def unauthorized():
+  # TODO: Use 403 instead of 401 to prevent auth pop-ups on client.
+  return make_response(jsonify({'error': 'Unauthorized access'}), 401)
+
+# TODO: do we need this?
+@infinote.route('/infinote/api/v1.0/logout', methods=['GET'])
+def logout():
+  return make_response(jsonify({'success': 'Logged out'}), 401)
 
 
 
