@@ -24,34 +24,32 @@ class JobTracker():
     self.j_id = j_id
 
   def set_attribute(self, key, value):
-    if current_jobs and current_jobs[self.j_id]:
-      if key in current_jobs[self.j_id]:
-        current_jobs[self.j_id][key] = value
+    global runtime_data
+    return runtime_data.set_attribute(self.u_id, self.j_id, key, value)
 
   def update_stage(self, stage):
-    if current_jobs and current_jobs[self.j_id]:
-      self.set_attribute('stage', stage) # TODO: sanity check value?
-      self.set_attribute('timestamp', datetime.utcnow().timestamp())
-      if stage is 'done':
-        # Need app context to generate link url.
-        with infinote.app_context():
-          self.set_attribute('link', url_for('get_file', j_id=self.j_id, _external=True))
+    self.set_attribute('stage', stage) # TODO: sanity check value?
+    self.set_attribute('timestamp', datetime.utcnow().timestamp())
+    if stage is 'done':
+      # Need app context to generate link url.
+      with infinote.app_context():
+        self.set_attribute('link', url_for('get_file', j_id=self.j_id, _external=True))
 
   def download_prog(self, total, recvd, ratio, rate, eta):
-    if current_jobs and current_jobs[self.j_id]:
-      self.set_attribute('prog', ratio)
-      self.set_attribute('timestamp', datetime.utcnow().timestamp())
+    self.set_attribute('prog', ratio)
+    self.set_attribute('timestamp', datetime.utcnow().timestamp())
 
   def convert_prog(self, ratio):
-    if current_jobs and current_jobs[self.j_id]:
-      self.set_attribute('prog', ratio)
-      self.set_attribute('timestamp', datetime.utcnow().timestamp())
+    self.set_attribute('prog', ratio)
+    self.set_attribute('timestamp', datetime.utcnow().timestamp())
 
   def handle_error(self, exception):
-    if current_jobs and current_jobs[self.j_id]:
-      print('GOT AN ERROR!')
-      print(exception)
-      current_jobs.pop(self.j_id)
+    global runtime_data
+    print('GOT AN ERROR!')
+    print(exception)
+    j = runtime_data.delJob(self.u_id, self.j_id)
+    db.session.delete(j)
+    db.session.commit()
 
 
 ##################
