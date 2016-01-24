@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-import unittest
+import unittest, time
 from datetime import datetime
+from threading import Thread
 from unittest.mock import MagicMock, patch
 from app.models import User, Job, RuntimeData, RuntimeDataException
 
@@ -519,6 +520,33 @@ class RuntimeDataTestCases(unittest.TestCase):
 
     res = self.dummy_rtd.get_attribute(uid_2, jid_3, 'stage')
     self.assertEqual(new_value, res)
+
+  def test_z_threaded_real_world_run(self):
+    uid = 1
+    jid = 5
+    key='stage'
+    new_value='done'
+    mock_job_data = dict(zip(self.dummy_rtd.valid_keys, self.dummy_rtd.default_values))
+
+    # Setup and verify precondition
+    self.dummy_rtd.data = {uid:{jid:mock_job_data}}
+    res = self.dummy_rtd.getJob(uid, jid)
+    self.assertDictEqual(mock_job_data, res)
+
+    t = Thread(target=self.dummy_rtd.set_attribute, args=(uid, jid, key, new_value))
+
+    self.dummy_rtd.data_lock.acquire()
+    t.start()
+    time.sleep(1)
+    self.assertTrue(t.is_alive())
+    self.dummy_rtd.data_lock.release()
+    t.join()
+    self.assertFalse(t.is_alive())
+
+    # Verify change
+    mock_job_data[key]=new_value
+    self.assertDictEqual(mock_job_data, self.dummy_rtd.data[uid][jid])
+
 
 
 if __name__ == '__main__':

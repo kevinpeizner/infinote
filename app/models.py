@@ -1,5 +1,6 @@
 from app import db
 from datetime import datetime, timezone
+from threading import RLock
 from passlib.apps import custom_app_context as pwd_context
 
 
@@ -79,29 +80,34 @@ class RuntimeData():
 
   def __init__(self):
     self.data = {}
+    self.data_lock = RLock()
 
   # User Layer
   def addNewUser(self, u_id):
-    if u_id in self.data:
-      return False
-    else:
-      self.data[u_id] = {}
-      return True
+    with self.data_lock:
+      if u_id in self.data:
+        return False
+      else:
+        self.data[u_id] = {}
+        return True
 
   def getUser(self, u_id):
-    return self.data.get(u_id, None)
+    with self.data_lock:
+      return self.data.get(u_id, None)
 
   def updateUser(self, u_id, data):
-    if not isinstance(data, dict) or self.getUser(u_id) is None:
-      return False
-    else:
-      # Update a user's dictionary of jobs.
-      # Overrides matching jobs and adds new ones.
-      self.data[u_id].update(data)
-      return True
+    with self.data_lock:
+      if not isinstance(data, dict) or self.getUser(u_id) is None:
+        return False
+      else:
+        # Update a user's dictionary of jobs.
+        # Overrides matching jobs and adds new ones.
+        self.data[u_id].update(data)
+        return True
 
   def delUser(self, u_id):
-    return self.data.pop(u_id, None)
+    with self.data_lock:
+      return self.data.pop(u_id, None)
 
   # Job Layer
   def _gen_job_id(self, v_id):
@@ -112,25 +118,26 @@ class RuntimeData():
     return j_id
 
   def createJob(self, u_id, v_id):
-    j_id = self._gen_job_id(v_id)
-    if not j_id:
-      raise RuntimeDataException(400, 'Unable to generate job id.') #TODO: handle this w/o this exception.
+    with self.data_lock:
+      j_id = self._gen_job_id(v_id)
+      if not j_id:
+        raise RuntimeDataException(400, 'Unable to generate job id.') #TODO: handle this w/o this exception.
 
-    if self.getJob(u_id, j_id):
-      raise RuntimeDataException(409, 'Job is already being processed.') #TODO: handle this w/o this exception.
+      if self.getJob(u_id, j_id):
+        raise RuntimeDataException(409, 'Job is already being processed.') #TODO: handle this w/o this exception.
 
-    job = dict(zip(self.valid_keys, self.default_values))
-    job['id'] = j_id
-    job['v_id'] = v_id
-    job['timestamp'] = datetime.utcnow().replace(tzinfo=timezone.utc).timestamp()
+      job = dict(zip(self.valid_keys, self.default_values))
+      job['id'] = j_id
+      job['v_id'] = v_id
+      job['timestamp'] = datetime.utcnow().replace(tzinfo=timezone.utc).timestamp()
 
-    # We should never fail to add a new job at this point,
-    # but let's be smart and check anyways.
-    if not self.addNewJob(u_id, j_id, job):
-      raise RuntimeDataException(500, 'Failed to add new job.')
-      return '', ''
+      # We should never fail to add a new job at this point,
+      # but let's be smart and check anyways.
+      if not self.addNewJob(u_id, j_id, job):
+        raise RuntimeDataException(500, 'Failed to add new job.')
+        return '', ''
 
-    return j_id, job['timestamp']
+      return j_id, job['timestamp']
 
   def _is_job_dict(self, d):
     if not isinstance(d, dict):
@@ -140,49 +147,55 @@ class RuntimeData():
     return True
 
   def addNewJob(self, u_id, j_id, data):
-    if not self._is_job_dict(data):
-      return False
-    if self.getUser(u_id) is not None:
-      if self.getJob(u_id, j_id) is not None:
+    with self.data_lock:
+      if not self._is_job_dict(data):
         return False
-    else:
-      self.addNewUser(u_id)
-    return self.updateUser(u_id, {j_id:data})
+      if self.getUser(u_id) is not None:
+        if self.getJob(u_id, j_id) is not None:
+          return False
+      else:
+        self.addNewUser(u_id)
+      return self.updateUser(u_id, {j_id:data})
 
   def getJob(self, u_id, j_id):
-    user_data = self.getUser(u_id)
-    if not user_data:
-      return None
-    else:
-      return user_data.get(j_id, None)
+    with self.data_lock:
+      user_data = self.getUser(u_id)
+      if not user_data:
+        return None
+      else:
+        return user_data.get(j_id, None)
 
   def updateJob(self, u_id, j_id, data):
-    if not self._is_job_dict(data):
-      return False
-    if self.getJob(u_id, j_id) is None:
-      return False
-    else:
-      self.data[u_id][j_id].update(data)
-      return True
+    with self.data_lock:
+      if not self._is_job_dict(data):
+        return False
+      if self.getJob(u_id, j_id) is None:
+        return False
+      else:
+        self.data[u_id][j_id].update(data)
+        return True
 
   def delJob(self, u_id, j_id):
-    if self.getUser(u_id) is None:
-      return None
-    else:
-      return self.data[u_id].pop(j_id, None)
+    with self.data_lock:
+      if self.getUser(u_id) is None:
+        return None
+      else:
+        return self.data[u_id].pop(j_id, None)
 
   # Data Layer:
   def get_attribute(self, u_id, j_id, key):
-    job_data = self.getJob(u_id, j_id)
-    if job_data is None:
-      return None
-    else:
-      return job_data.get(key, None)
+    with self.data_lock:
+      job_data = self.getJob(u_id, j_id)
+      if job_data is None:
+        return None
+      else:
+        return job_data.get(key, None)
 
   def set_attribute(self, u_id, j_id, key, value):
-    # We don't allow adding NEW attributes.
-    if self.get_attribute(u_id, j_id, key) is None or value is None:
-      return False
-    else:
-      self.data[u_id][j_id][key] = value
-      return True
+    with self.data_lock:
+      # We don't allow adding NEW attributes.
+      if self.get_attribute(u_id, j_id, key) is None or value is None:
+        return False
+      else:
+        self.data[u_id][j_id][key] = value
+        return True
