@@ -270,11 +270,10 @@ def get_jobs():
 
 # Read x
 @infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['GET'])
-#@auth.login_required
+@auth.login_required
 def get_job(j_id):
-  try:
-    job = current_jobs[str(j_id)]
-  except KeyError:
+  job = runtime_data.getJob(g.user.id, j_id)
+  if job is None:
     abort(404)
   return jsonify({'job': _make_public_job(g.user.id, j_id)})
 
