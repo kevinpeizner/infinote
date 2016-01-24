@@ -196,7 +196,7 @@ def count_sync():
 ### USER REGISTRATION ###
 #########################
 # Validate one time passcode.
-def verify_otp(code):
+def _verify_otp(code):
   global otp_count
   result = hotp.verify(code, otp_count)
   if result:
@@ -204,7 +204,7 @@ def verify_otp(code):
   return result
 
 # Validate registration.
-def validate_registration(json):
+def _validate_registration(json):
   if not 'otp' in json:
     raise ProcessException(400, 'One time passcode required.')
   if not 'name' in json:
@@ -213,7 +213,7 @@ def validate_registration(json):
     raise ProcessException(400, 'Password required.')
   if not 'email' in json:
     raise ProcessException(400, 'Email required.')
-  if not verify_otp(json['otp']):
+  if not _verify_otp(json['otp']):
     raise ProcessException(401, 'Invalid OTP')
   return True
 
@@ -224,7 +224,7 @@ def register():
   if not request.json:
     abort(400, 'Invalid request.')
   try:
-    if validate_registration(request.json):
+    if _validate_registration(request.json):
       new_user = User(request.json['name'], request.json['email'])
       new_user.hash_password(request.json['password'])
       print(new_user)
