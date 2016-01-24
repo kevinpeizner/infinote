@@ -244,6 +244,7 @@ def register():
 ### API CRUD ###
 ################
 # Create
+# TODO: do I need to worry about CRFS?
 @infinote.route('/infinote/api/v1.0/jobs', methods=['POST'])
 @auth.login_required
 def create_job():
