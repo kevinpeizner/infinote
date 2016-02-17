@@ -130,7 +130,7 @@ def test():
 @infinote.route('/infinote/api/v1.0/auth_test')
 @auth.login_required
 def auth_test():
-  return 'Auth Success! Got User {}'.format(g.user.username)
+  return jsonify({'Result':'Auth Success! Got User {}'.format(g.user.username)}), 200
 
 
 
@@ -262,11 +262,11 @@ def create_job():
 @auth.login_required
 def get_jobs():
   u_id = g.user.id
-  jobs = []
+  jobs = {}
   user_data = runtime_data.getUser(u_id)
   if user_data is not None:
     for j_id in user_data:
-      jobs.append(_make_public_job(u_id, j_id))
+      jobs[str(j_id)] = _make_public_job(u_id, j_id)
   return jsonify({'jobs': jobs})
 
 # Read x
@@ -280,12 +280,13 @@ def get_job(j_id):
 
 # Get File
 @infinote.route('/infinote/api/v1.0/jobs/<int:j_id>/link', methods=['GET'])
-#@auth.login_required
+@auth.login_required
 def get_file(j_id):
-  try:
-    job = current_jobs[str(j_id)]
-  except KeyError:
+  job = runtime_data.getJob(g.user.id, j_id)
+  if not job:
     abort(404)
+  if job['stage'] is not 'done':
+    abort(400, 'Job is not complete.')
   return send_from_directory(download_dir, job['label']+'.mp3', as_attachment=True)
 
 ## Update
@@ -311,18 +312,15 @@ def get_file(j_id):
 
 # Delete
 @infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['DELETE'])
-#@auth.login_required
+@auth.login_required
 def delete_job(j_id):
-  try:
-    job = current_jobs[str(j_id)]
-  except KeyError:
+  job = runtime_data.delJob(g.user.id, j_id)
+  if job is None:
     abort(404)
-  current_jobs.pop(str(j_id))
   return jsonify({'result': True})
 
 
 
-####@infinote.before_first_request
 def setup(*args, **kwargs):
   global runtime_data
   global otp_count
@@ -337,5 +335,3 @@ if __name__ == '__main__':
   infinote = Flask(__name__)
   infinote.run(debug=True)
   print("I'm alive!")
-
-
