@@ -8,9 +8,9 @@ from flask.ext.testing import TestCase
 from contextlib import suppress
 from werkzeug.exceptions import NotFound, MethodNotAllowed
 from werkzeug.routing import RequestRedirect
-from config import basedir
-from app import infinote, db, api_server
-from app.api_server import ProcessException
+from app import infinote
+from app.config import basedir, infinote_app, db
+from app.infinote import ProcessException
 from app.models import User, Job, RuntimeData, RuntimeDataException
 
 
@@ -37,49 +37,49 @@ class HelperTestCases(unittest.TestCase):
     }
 
     # case 1
-    api_server.runtime_data.getJob = MagicMock(return_value=None)
-    api_server.abort = MagicMock()
-    res = api_server._make_public_job(uid, jid)
-    api_server.abort.assert_called_with(404)
+    infinote.runtime_data.getJob = MagicMock(return_value=None)
+    infinote.abort = MagicMock()
+    res = infinote._make_public_job(uid, jid)
+    infinote.abort.assert_called_with(404)
     self.assertEqual({'error': 'Not found'}, res)
-    api_server.runtime_data.getJob.assert_called_once_with(uid, jid)
+    infinote.runtime_data.getJob.assert_called_once_with(uid, jid)
 
-    api_server.runtime_data.getJob.reset_mock()
+    infinote.runtime_data.getJob.reset_mock()
 
     # case 2
-    api_server.runtime_data.getJob = MagicMock(return_value=mock_job)
-    api_server.url_for = MagicMock(return_value='http://mock_job_link')
-    res = api_server._make_public_job(uid, jid)
+    infinote.runtime_data.getJob = MagicMock(return_value=mock_job)
+    infinote.url_for = MagicMock(return_value='http://mock_job_link')
+    res = infinote._make_public_job(uid, jid)
     expected = mock_job
     expected['uri']='http://mock_job_link'
     expected.pop('id')
     self.assertEqual(expected, res)
-    api_server.runtime_data.getJob.assert_called_once_with(uid, jid)
+    infinote.runtime_data.getJob.assert_called_once_with(uid, jid)
 
   def test_extract_v_id(self):
     # case 1
     expected = test_data = '11111111111'
-    res = api_server._extract_v_id(test_data)
+    res = infinote._extract_v_id(test_data)
     self.assertEqual(expected, res)
     
     # case 2
     test_data = 'www.youtube.com/watch?v=11111111111'
-    res = api_server._extract_v_id(test_data)
+    res = infinote._extract_v_id(test_data)
     self.assertEqual(expected, res)
 
     # case 3
     test_data = 'youtube.com/watch?v=11111111111'
-    res = api_server._extract_v_id(test_data)
+    res = infinote._extract_v_id(test_data)
     self.assertEqual(expected, res)
 
     # case 4
     test_data = 'youtu.com/watch?v=11111111111'
-    res = api_server._extract_v_id(test_data)
+    res = infinote._extract_v_id(test_data)
     self.assertIsNone(res)
 
     # case 5
     test_data = ''
-    res = api_server._extract_v_id(test_data)
+    res = infinote._extract_v_id(test_data)
     self.assertIsNone(res)
 
   def test_spaw_job(self):
@@ -89,23 +89,23 @@ class HelperTestCases(unittest.TestCase):
     v_id = '11111111111'
 
     # case 1a/1b - _extract_v_id fails
-    api_server._extract_v_id = MagicMock(return_value=None)
-    self.assertRaises(ProcessException, api_server._spawn_job, "Don't care", link)
-    api_server._extract_v_id.assert_called_once_with(link)
-    api_server._extract_v_id.reset_mock()
-    api_server._extract_v_id = MagicMock(return_value='2346')
-    self.assertRaises(ProcessException, api_server._spawn_job, "Don't care", link)
-    api_server._extract_v_id.assert_called_once_with(link)
-    api_server._extract_v_id.reset_mock()
+    infinote._extract_v_id = MagicMock(return_value=None)
+    self.assertRaises(ProcessException, infinote._spawn_job, "Don't care", link)
+    infinote._extract_v_id.assert_called_once_with(link)
+    infinote._extract_v_id.reset_mock()
+    infinote._extract_v_id = MagicMock(return_value='2346')
+    self.assertRaises(ProcessException, infinote._spawn_job, "Don't care", link)
+    infinote._extract_v_id.assert_called_once_with(link)
+    infinote._extract_v_id.reset_mock()
 
     # case 2 - createJob fails
-    api_server._extract_v_id = MagicMock(return_value=v_id)
-    api_server.runtime_data.createJob = MagicMock(side_effect=RuntimeDataException(400, 'mock_exception'))
-    self.assertRaises(ProcessException, api_server._spawn_job, u, link)
-    api_server.runtime_data.createJob.assert_called_once_with(u.id, v_id)
-    api_server._extract_v_id.assert_called_once_with(link)
-    api_server.runtime_data.createJob.reset_mock()
-    api_server._extract_v_id.reset_mock()
+    infinote._extract_v_id = MagicMock(return_value=v_id)
+    infinote.runtime_data.createJob = MagicMock(side_effect=RuntimeDataException(400, 'mock_exception'))
+    self.assertRaises(ProcessException, infinote._spawn_job, u, link)
+    infinote.runtime_data.createJob.assert_called_once_with(u.id, v_id)
+    infinote._extract_v_id.assert_called_once_with(link)
+    infinote.runtime_data.createJob.reset_mock()
+    infinote._extract_v_id.reset_mock()
 
 
 class APITestCases(TestCase):
@@ -120,10 +120,10 @@ class APITestCases(TestCase):
 
   @classmethod
   def setUpClass(cls):
-    APITestCases.url_map = infinote.url_map
+    APITestCases.url_map = infinote_app.url_map
 
   def setUp(self):
-    self.test_client = infinote.test_client()
+    self.test_client = infinote_app.test_client()
     db.create_all()
 
   def tearDown(self):
@@ -394,8 +394,8 @@ class APITestCases(TestCase):
       for k, v in value.items():
         if k == 'id':
           k = 'uri'
-          v = 'http://' + str(infinote.config['HOST']) + \
-              ':' + str(infinote.config['PORT']) + \
+          v = 'http://' + str(infinote_app.config['HOST']) + \
+              ':' + str(infinote_app.config['PORT']) + \
               '/infinote/api/v1.0/jobs/' + str(v)
         self.assertEqual(v, job[k])
 
@@ -455,8 +455,8 @@ class APITestCases(TestCase):
       'link': 'http://somelink.com',
       'timestamp': mock_ts_2
     }
-    # prime runtime_data structure in api_server.
-    api_server.runtime_data.data = {uid:{jid_1:mock_job_1, jid_2:mock_job_2}}
+    # prime runtime_data structure in infinote.
+    infinote.runtime_data.data = {uid:{jid_1:mock_job_1, jid_2:mock_job_2}}
     expected_resp = {
         'jobs':{str(jid_1):mock_job_1, str(jid_2):mock_job_2}
     }

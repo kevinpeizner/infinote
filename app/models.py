@@ -1,4 +1,4 @@
-from app import db
+from app.config import db
 from datetime import datetime, timezone
 from threading import RLock
 from passlib.apps import custom_app_context as pwd_context

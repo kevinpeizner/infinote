@@ -1,17 +1,16 @@
 from flask import Flask, jsonify, abort, make_response, request, url_for, current_app, send_from_directory, g
 from flask.ext.httpauth import HTTPBasicAuth
-from app import infinote, db, ripper
+from app.config import infinote_app
 from app.models import User, Job, RuntimeData, RuntimeDataException
 from datetime import datetime
 import re, pyotp, threading
 
 v_id_len = 11
-download_dir = infinote.root_path+infinote.config['DOWNLOAD_DIR']
+download_dir = infinote_app.root_path+infinote_app.config['DOWNLOAD_DIR']
 otp_count = 0
-hotp = pyotp.HOTP(infinote.config['OPT_SECRET'])
+hotp = pyotp.HOTP(infinote_app.config['OPT_SECRET'])
 auth = HTTPBasicAuth() # Just base64 encodes credentials -- NOT SECURE UNLESS DONE ON HTTPS CONNECTION
 runtime_data = None
-
 
 ##################
 ### Data Model ###
@@ -32,7 +31,7 @@ class JobTracker():
     self.set_attribute('timestamp', datetime.utcnow().timestamp())
     if stage is 'done':
       # Need app context to generate link url.
-      with infinote.app_context():
+      with infinote_app.app_context():
         self.set_attribute('link', url_for('get_file', j_id=self.j_id, _external=True))
 
   def download_prog(self, total, recvd, ratio, rate, eta):
@@ -122,12 +121,16 @@ def _spawn_job(user, link):
 ################
 ### TESTING  ###
 ################
-@infinote.route('/')
-@infinote.route('/index')
-def test():
+@infinote_app.route('/')
+@infinote_app.route('/index')
+def test1():
   return 'Hello World!'
 
-@infinote.route('/infinote/api/v1.0/auth_test')
+@infinote_app.route('/hi')
+def test2():
+  return 'Hello World 2!'
+
+@infinote_app.route('/infinote/api/v1.0/auth_test')
 @auth.login_required
 def auth_test():
   return jsonify({'Result':'Auth Success! Got User {}'.format(g.user.username)}), 200
@@ -137,15 +140,15 @@ def auth_test():
 ######################
 ### Error Handlers ###
 ######################
-@infinote.errorhandler(400)
+@infinote_app.errorhandler(400)
 def bad_request(error):
   return make_response(jsonify({'error': 'Bad request', 'desc':error.description}), 400)
 
-@infinote.errorhandler(404)
+@infinote_app.errorhandler(404)
 def not_found(error):
   return make_response(jsonify({'error': 'Not found', 'desc':error.description}), 404)
 
-@infinote.errorhandler(409)
+@infinote_app.errorhandler(409)
 def request_conflict(error):
   return make_response(jsonify({'error': 'Request conflict', 'desc':error.description}), 409)
 
@@ -155,7 +158,7 @@ def request_conflict(error):
 ### App Managment ###
 #####################
 # Sync OTP count
-@infinote.route('/infinote/api/v1.0/sync', methods=['GET', 'POST'])
+@infinote_app.route('/infinote/api/v1.0/sync', methods=['GET', 'POST'])
 # @auth.login_required
 # TODO: check for admin user
 def count_sync():
@@ -195,7 +198,7 @@ def _validate_registration(json):
 
 # Register User.
 # TODO: Should I worry about CRSF? Does the OTP take care of this? -- even though that wasn't the intended purpose.
-@infinote.route('/infinote/api/v1.0/register', methods=['POST'])
+@infinote_app.route('/infinote/api/v1.0/register', methods=['POST'])
 def register():
   if not request.json:
     abort(400, 'Invalid request.')
@@ -235,7 +238,7 @@ def unauthorized():
   return make_response(jsonify({'error': 'Unauthorized access'}), 401)
 
 # TODO: do we need this?
-@infinote.route('/infinote/api/v1.0/logout', methods=['GET'])
+@infinote_app.route('/infinote/api/v1.0/logout', methods=['GET'])
 def logout():
   return make_response(jsonify({'success': 'Logged out'}), 401)
 
@@ -246,7 +249,7 @@ def logout():
 ################
 # Create
 # TODO: do I need to worry about CRFS?
-@infinote.route('/infinote/api/v1.0/jobs', methods=['POST'])
+@infinote_app.route('/infinote/api/v1.0/jobs', methods=['POST'])
 @auth.login_required
 def create_job():
   if not request.json or not 'v_id' in request.json:
@@ -258,7 +261,7 @@ def create_job():
   return jsonify({'job': _make_public_job(j_id)}), 201
 
 # Read All
-@infinote.route('/infinote/api/v1.0/jobs', methods=['GET'])
+@infinote_app.route('/infinote/api/v1.0/jobs', methods=['GET'])
 @auth.login_required
 def get_jobs():
   u_id = g.user.id
@@ -270,7 +273,7 @@ def get_jobs():
   return jsonify({'jobs': jobs})
 
 # Read x
-@infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['GET'])
+@infinote_app.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['GET'])
 @auth.login_required
 def get_job(j_id):
   job = runtime_data.getJob(g.user.id, j_id)
@@ -279,7 +282,7 @@ def get_job(j_id):
   return jsonify({'job': _make_public_job(g.user.id, j_id)})
 
 # Get File
-@infinote.route('/infinote/api/v1.0/jobs/<int:j_id>/link', methods=['GET'])
+@infinote_app.route('/infinote/api/v1.0/jobs/<int:j_id>/link', methods=['GET'])
 @auth.login_required
 def get_file(j_id):
   job = runtime_data.getJob(g.user.id, j_id)
@@ -311,7 +314,7 @@ def get_file(j_id):
 #  return jsonify({'job': _make_public_job(job['id'])})
 
 # Delete
-@infinote.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['DELETE'])
+@infinote_app.route('/infinote/api/v1.0/jobs/<int:j_id>', methods=['DELETE'])
 @auth.login_required
 def delete_job(j_id):
   job = runtime_data.delJob(g.user.id, j_id)
@@ -332,6 +335,4 @@ def setup(*args, **kwargs):
 setup()
 
 if __name__ == '__main__':
-  infinote = Flask(__name__)
-  infinote.run(debug=True)
-  print("I'm alive!")
+  infinote_app.run(host=infinote_app.config['HOST'],port=infinote_app.config['PORT'], debug=True)
